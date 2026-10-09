@@ -214,7 +214,7 @@ export default (): Configuration => {
       publicUrl: isMinio
         ? `${trimUrl(process.env.MINIO_PUBLIC_URL ?? 'http://localhost:9000')}/${bucket}`
         : trimUrl(
-            process.env.S3_PUBLIC_URL ??
+            process.env.S3_PUBLIC_URL ||
               `https://${bucket}.s3.${process.env.AWS_REGION ?? 'ap-south-1'}.amazonaws.com`,
           ),
       maxBytes: int(process.env.UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
