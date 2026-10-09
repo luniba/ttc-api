@@ -10,9 +10,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CookieService } from './cookie.service';
 import { RefreshToken } from './entities/refresh-token.entity';
-import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { RecaptchaService } from './recaptcha.service';
 
 @Module({
   imports: [
@@ -34,7 +32,7 @@ import { RecaptchaService } from './recaptcha.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, CookieService, RecaptchaService, JwtStrategy, GoogleStrategy],
+  providers: [AuthService, CookieService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

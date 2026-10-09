@@ -11,11 +11,9 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
-  ApiExcludeEndpoint,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
@@ -26,10 +24,8 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import type { GoogleConfig } from '../../config/configuration';
 import { User } from '../users/entities/user.entity';
 import { toSafeUser, type SafeUser } from '../users/user.mapper';
-import type { GoogleProfileData } from '../users/users.service';
 import { AuthErrorCode, REFRESH_COOKIE } from './auth.constants';
 import { AuthService, type SessionContext } from './auth.service';
 import { CookieService } from './cookie.service';
@@ -41,8 +37,6 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ResendVerificationDto, VerifyEmailDto } from './dto/verify-email.dto';
 import { CsrfGuard } from './guards/csrf.guard';
-import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { RecaptchaService } from './recaptcha.service';
 
 /** Shape returned whenever a session is established. */
 interface SessionResponse {
@@ -57,16 +51,10 @@ interface SessionResponse {
 // Default cap for the whole controller; individual routes tighten it further.
 @Throttle({ default: { ttl: 60_000, limit: 20 } })
 export class AuthController {
-  private readonly google: GoogleConfig;
-
   constructor(
     private readonly auth: AuthService,
-    private readonly recaptcha: RecaptchaService,
     private readonly cookies: CookieService,
-    config: ConfigService,
-  ) {
-    this.google = config.getOrThrow<GoogleConfig>('google');
-  }
+  ) {}
 
   @Post('register')
   @Public()
@@ -78,8 +66,7 @@ export class AuthController {
       'Returns no session: the account cannot sign in until the email is confirmed.',
   })
   @ApiConflictResponse({ description: 'Email already registered.' })
-  async register(@Body() dto: RegisterDto, @Req() req: Request) {
-    await this.assertHuman(dto.recaptchaToken, req);
+  async register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
 
@@ -124,8 +111,6 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionResponse> {
-    await this.assertHuman(dto.recaptchaToken, req);
-
     const user = await this.auth.validateUser(dto.email, dto.password);
 
     if (!user) {
@@ -139,35 +124,6 @@ export class AuthController {
 
     const result = await this.auth.login(user, sessionContext(req));
     return this.establishSession(res, result);
-  }
-
-  @Get('google')
-  @Public()
-  @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Start Google OAuth. Redirects to Google.' })
-  googleAuth(): void {
-    // The guard performs the redirect; this body never runs.
-  }
-
-  @Get('google/callback')
-  @Public()
-  @UseGuards(GoogleAuthGuard)
-  @ApiExcludeEndpoint()
-  async googleCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
-    const profile = req.user as GoogleProfileData;
-
-    try {
-      const result = await this.auth.loginWithGoogle(profile, sessionContext(req));
-      this.cookies.setSession(res, result.refreshToken);
-
-      // No tokens in the redirect URL — query strings land in browser history and server logs; the session rides in the cookie set above.
-      res.redirect(this.google.successRedirect);
-    } catch (error) {
-      const url = new URL(this.google.successRedirect);
-      url.searchParams.set('error', 'google_auth_failed');
-      res.redirect(url.toString());
-      void error;
-    }
   }
 
   @Post('refresh')
@@ -231,8 +187,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 3 } })
   @ApiOperation({ summary: 'Request a password reset link' })
   @ApiOkResponse({ description: 'Always the same generic message.' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
-    await this.assertHuman(dto.recaptchaToken, req);
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
     await this.auth.forgotPassword(dto.email);
     return {
       message: 'If an account exists for that email, a reset link has been sent.',
@@ -274,11 +229,8 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get the signed-in user' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token.' })
-  async me(@CurrentUser() user: User) {
-    return {
-      ...toSafeUser(user),
-      hasPassword: await this.auth.hasPassword(user.email),
-    };
+  me(@CurrentUser() user: User): SafeUser {
+    return toSafeUser(user);
   }
 
   @Patch('me')
@@ -287,10 +239,7 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token.' })
   async updateMe(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
     const updated = await this.auth.updateProfile(user.id, dto.name);
-    return {
-      ...toSafeUser(updated),
-      hasPassword: await this.auth.hasPassword(updated.email),
-    };
+    return toSafeUser(updated);
   }
 
   private establishSession(
@@ -300,17 +249,6 @@ export class AuthController {
     const csrfToken = this.cookies.setSession(res, result.refreshToken);
     // refreshToken stays out of the body — it lives only in the httpOnly cookie, unreachable by XSS.
     return { user: result.user, accessToken: result.accessToken, csrfToken };
-  }
-
-  private async assertHuman(token: string | undefined, req: Request): Promise<void> {
-    const passed = await this.recaptcha.verify(token, req.ip);
-    if (!passed) {
-      throw new UnauthorizedException({
-        message: 'Captcha verification failed',
-        error: 'Unauthorized',
-        code: AuthErrorCode.CAPTCHA_FAILED,
-      });
-    }
   }
 }
 

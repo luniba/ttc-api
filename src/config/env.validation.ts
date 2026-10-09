@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// Boot-time validation for vars that must never be silently wrong; optional integrations (Google, SMTP, reCAPTCHA) degrade gracefully instead.
+// Boot-time validation for vars that must never be silently wrong; optional integrations (SMTP) degrade gracefully instead.
 enum Environment {
   Development = 'development',
   Production = 'production',
@@ -49,9 +49,6 @@ class EnvironmentVariables {
 
   @IsUrl({ require_tld: false })
   FRONTEND_URL!: string;
-
-  @IsUrl({ require_tld: false })
-  BACKEND_URL!: string;
 
   @IsOptional()
   @IsBooleanString()
@@ -116,10 +113,6 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
     // Reflection means any site could make credentialed requests on a user's behalf — fine on localhost, never in production.
     if (corsAllowAll) {
       throw new Error('Invalid environment configuration:\n  - CORS_ORIGINS cannot be "*" in production. It reflects every origin, letting any site make credentialed requests. List exact origins.');
-    }
-    if (!config.RECAPTCHA_SECRET) {
-      // Loud, but not fatal: some deployments front the API with a WAF instead.
-      console.warn('[env] RECAPTCHA_SECRET is not set — captcha verification is disabled in production.');
     }
   }
 

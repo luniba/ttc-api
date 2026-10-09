@@ -21,7 +21,7 @@ export function setupSwagger(app: INestApplication, prefix: string): void {
     )
     .addTag(
       'auth',
-      'Registration, login, Google OAuth, email verification, password reset',
+      'Registration, login, email verification, password reset',
     )
     .addTag('health', 'Liveness and readiness probes')
     .addTag('uploads', 'Image upload — returns a storage key')

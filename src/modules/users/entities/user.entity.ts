@@ -24,11 +24,6 @@ export const STAFF_ROLES = [
 export const isStaff = (role: UserRole): boolean =>
   (STAFF_ROLES as readonly UserRole[]).includes(role);
 
-export enum AuthProvider {
-  LOCAL = 'local',
-  GOOGLE = 'google',
-}
-
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -40,7 +35,7 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   email!: string;
 
-  // Nullable for Google-only accounts. select:false keeps it out of every default query — it can only leak if explicitly asked for.
+  // select:false keeps it out of every default query — it can only leak if explicitly asked for.
   @Column({
     name: 'password_hash',
     type: 'varchar',
@@ -54,18 +49,6 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.STUDENT })
   role!: UserRole;
-
-  @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.LOCAL })
-  provider!: AuthProvider;
-
-  // Google's stable subject id. Partial unique index: many rows may be NULL,
-  // but a given Google account can only ever link to one user.
-  @Index('uq_users_google_id', { unique: true, where: 'google_id IS NOT NULL' })
-  @Column({ name: 'google_id', type: 'varchar', nullable: true })
-  googleId!: string | null;
-
-  @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
-  avatarUrl!: string | null;
 
   @Column({ name: 'email_verified', type: 'boolean', default: false })
   emailVerified!: boolean;

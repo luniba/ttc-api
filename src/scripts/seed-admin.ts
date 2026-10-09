@@ -1,7 +1,7 @@
 import { config as loadEnv } from 'dotenv';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import { AuthProvider, User, UserRole } from '../modules/users/entities/user.entity';
+import { User, UserRole } from '../modules/users/entities/user.entity';
 
 // Deliberately a manual script, not something that runs on boot: an auto-seeding app would recreate an admin someone intentionally
 // removed, and carry the seed password into every environment it starts in. Run with: npm run seed:admin
@@ -48,7 +48,6 @@ async function seedAdmin(): Promise<void> {
         email,
         name,
         role: UserRole.ADMIN,
-        provider: AuthProvider.LOCAL,
         passwordHash: await bcrypt.hash(password, rounds),
         // Seeded by an operator who already controls the deployment — nothing for an email round-trip to prove.
         emailVerified: true,

@@ -18,7 +18,6 @@ export const ErrorCode = {
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   INVALID_SESSION: 'INVALID_SESSION',
-  CAPTCHA_FAILED: 'CAPTCHA_FAILED',
   CSRF_FAILED: 'CSRF_FAILED',
   // Includes soft-deleted rows, which still hold the unique index.
   EMAIL_TAKEN: 'EMAIL_TAKEN',

@@ -141,29 +141,14 @@ completed, cancelled, failed, refunded. Deletes are soft.
 | `POST /auth/verify-email`        | Confirms address, establishes session.     |
 | `POST /auth/resend-verification` | Generic response (no enumeration).         |
 | `POST /auth/login`               | 403 `EMAIL_NOT_VERIFIED` until confirmed.  |
-| `GET  /auth/google`              | Starts Google OAuth.                       |
-| `GET  /auth/google/callback`     | Sets cookie, redirects — no tokens in URL. |
 | `POST /auth/refresh`             | Rotates the token. Needs CSRF header.      |
 | `POST /auth/logout`              | Needs CSRF header.                         |
 | `POST /auth/logout-all`          | Revokes every session.                     |
 | `POST /auth/forgot-password`     | Generic response.                          |
 | `POST /auth/reset-password`      | Revokes all sessions.                      |
 | `POST /auth/change-password`     | Revokes all sessions.                      |
-| `GET  /auth/me`                  | Current user + `hasPassword`.              |
+| `GET  /auth/me`                  | Current user.                              |
 | `PATCH /auth/me`                 | Update own name.                           |
-
-### Google / OAuth accounts
-
-`GET /auth/me` returns `hasPassword`, which is `false` for accounts created via
-Google. Use it to drive the UI:
-
-- `hasPassword: false` → offer "Set a password"; `POST /auth/change-password`
-  with only `newPassword` (no `currentPassword` required).
-- `hasPassword: true` → require `currentPassword`.
-
-`POST /auth/forgot-password` is a no-op for accounts with no password, so a
-Google-only account cannot have a password attached by anyone who merely
-receives the mail.
 
 ### CSRF
 
@@ -180,11 +165,9 @@ that header.
    is XSS-readable), send it as `Authorization: Bearer`.
 2. On 401, `POST /auth/refresh` with `credentials: 'include'` + `X-CSRF-Token`,
    then retry.
-3. After Google sign-in the browser lands on `GOOGLE_SUCCESS_REDIRECT` with the
-   cookie already set — call `/auth/refresh` to obtain the access token.
 
 Errors carry a stable `code` (`EMAIL_NOT_VERIFIED`, `INVALID_CREDENTIALS`,
-`INVALID_SESSION`, `CAPTCHA_FAILED`, `CSRF_FAILED`) — branch on that, not on the
+`INVALID_SESSION`, `CSRF_FAILED`) — branch on that, not on the
 human-readable message.
 
 ## Migrations
@@ -214,8 +197,7 @@ changes. On AWS, leave `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` empty so the
 SDK picks up the task/instance IAM role instead of long-lived keys.
 
 Also set for production: `COOKIE_SECURE=true`, `NODE_ENV=production`,
-`CORS_ORIGINS` to exact origins, a fresh `JWT_ACCESS_SECRET`, and
-`RECAPTCHA_SECRET`. Run `npm run migration:run` as a release step, not on boot.
+`CORS_ORIGINS` to exact origins, and a fresh `JWT_ACCESS_SECRET`. Run `npm run migration:run` as a release step, not on boot.
 
 Storage persists the object **key**, never the URL — so introducing CloudFront
 later needs no data migration.

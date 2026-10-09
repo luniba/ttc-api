@@ -61,9 +61,9 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(appConfig.port);
 
-  logger.log(`API listening on ${appConfig.backendUrl}${appConfig.apiPrefix}`);
+  logger.log(`API listening on http://localhost:${appConfig.port}${appConfig.apiPrefix}`);
   if (!appConfig.isProduction) {
-    logger.log(`Docs at ${appConfig.backendUrl}${appConfig.apiPrefix}/docs`);
+    logger.log(`Docs at http://localhost:${appConfig.port}${appConfig.apiPrefix}/docs`);
   }
 }
 

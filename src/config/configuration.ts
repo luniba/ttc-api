@@ -13,7 +13,6 @@ export interface AppConfig {
   // CORS_ORIGINS=* accepts any origin by reflecting it back (a literal `*` is illegal with credentials). Dev-only; refused in production.
   corsAllowAll: boolean;
   frontendUrl: string;
-  backendUrl: string;
   // Blanket per-IP ceiling only; configurable so test suites (all requests from one IP) don't throttle themselves.
   throttleTtlMs: number;
   throttleLimit: number;
@@ -47,14 +46,6 @@ export interface AuthConfig {
   cookie: CookieConfig;
 }
 
-export interface GoogleConfig {
-  clientId: string;
-  clientSecret: string;
-  callbackUrl: string;
-  successRedirect: string;
-  enabled: boolean;
-}
-
 export interface MailConfig {
   host: string;
   port: number;
@@ -80,12 +71,6 @@ export interface StorageConfig {
   maxBytes: number;
 }
 
-export interface RecaptchaConfig {
-  secret: string;
-  minScore: number;
-  enabled: boolean;
-}
-
 export interface AdminSeedConfig {
   email: string;
   password: string;
@@ -97,10 +82,8 @@ export interface Configuration {
   database: DatabaseConfig;
   redis: RedisConfig;
   auth: AuthConfig;
-  google: GoogleConfig;
   mail: MailConfig;
   storage: StorageConfig;
-  recaptcha: RecaptchaConfig;
   adminSeed: AdminSeedConfig;
 }
 
@@ -109,11 +92,6 @@ const bool = (value: string | undefined, fallback = false): boolean =>
 
 const int = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const float = (value: string | undefined, fallback: number): number => {
-  const parsed = Number.parseFloat(value ?? '');
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -128,7 +106,6 @@ export default (): Configuration => {
   const prefixSegment = (process.env.API_PREFIX ?? '').replace(/^\/+|\/+$/g, '');
   const apiPrefix = prefixSegment ? `/${prefixSegment}` : '';
   const frontendUrl = trimUrl(process.env.FRONTEND_URL ?? 'http://localhost:3000');
-  const backendUrl = trimUrl(process.env.BACKEND_URL ?? 'http://localhost:5010');
 
   const driver = (process.env.STORAGE_DRIVER ?? 'minio') as StorageDriver;
   const bucket = process.env.STORAGE_BUCKET ?? 'lms';
@@ -148,7 +125,6 @@ export default (): Configuration => {
         .split(',')
         .some((origin) => origin.trim() === '*'),
       frontendUrl,
-      backendUrl,
       throttleTtlMs: int(process.env.THROTTLE_TTL_MS, 60_000),
       throttleLimit: int(process.env.THROTTLE_LIMIT, 100),
     },
@@ -177,15 +153,6 @@ export default (): Configuration => {
         domain: process.env.COOKIE_DOMAIN || undefined,
         refreshPath: `${apiPrefix}/auth`,
       },
-    },
-
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-      callbackUrl:
-        process.env.GOOGLE_CALLBACK_URL ?? `${backendUrl}${apiPrefix}/auth/google/callback`,
-      successRedirect: process.env.GOOGLE_SUCCESS_REDIRECT ?? `${frontendUrl}/auth/callback`,
-      enabled: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     },
 
     mail: {
@@ -218,12 +185,6 @@ export default (): Configuration => {
               `https://${bucket}.s3.${process.env.AWS_REGION ?? 'ap-south-1'}.amazonaws.com`,
           ),
       maxBytes: int(process.env.UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
-    },
-
-    recaptcha: {
-      secret: process.env.RECAPTCHA_SECRET ?? '',
-      minScore: float(process.env.RECAPTCHA_MIN_SCORE, 0.5),
-      enabled: !!process.env.RECAPTCHA_SECRET,
     },
 
     adminSeed: {

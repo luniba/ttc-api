@@ -15,19 +15,11 @@ import type { AuthConfig } from '../../config/configuration';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import type { StudentQueryDto } from './dto/student.dto';
 import {
-  AuthProvider,
   STAFF_ROLES,
   User,
   UserRole,
   isStaff,
 } from './entities/user.entity';
-
-export interface GoogleProfileData {
-  googleId: string;
-  email: string;
-  name: string;
-  avatarUrl: string | null;
-}
 
 export interface CreateUserInput {
   email: string;
@@ -43,7 +35,6 @@ export interface StudentDto {
   name: string;
   email: string;
   emailVerified: boolean;
-  provider: AuthProvider;
   createdAt: Date;
 }
 
@@ -116,45 +107,10 @@ export class UsersService {
       email: UsersService.normalizeEmail(input.email),
       name: input.name.trim(),
       role: input.role ?? UserRole.STUDENT,
-      provider: AuthProvider.LOCAL,
       passwordHash: input.password
         ? await this.hashPassword(input.password)
         : null,
       emailVerified: input.emailVerified ?? false,
-    });
-    return this.repo.save(user);
-  }
-
-  // Lookup order matters: googleId first (stable link), then email — which lets a password-registered user later sign in with Google
-  // onto the same account. Only safe because Google has already verified the address.
-  async findOrCreateGoogleUser(profile: GoogleProfileData): Promise<User> {
-    const byGoogleId = await this.repo.findOne({
-      where: { googleId: profile.googleId },
-    });
-    if (byGoogleId) {
-      return byGoogleId;
-    }
-
-    const email = UsersService.normalizeEmail(profile.email);
-    const existing = await this.findByEmail(email);
-
-    if (existing) {
-      existing.googleId = profile.googleId;
-      existing.emailVerified = true;
-      existing.avatarUrl ??= profile.avatarUrl;
-      return this.repo.save(existing);
-    }
-
-    const user = this.repo.create({
-      email,
-      name: profile.name.trim() || email,
-      role: UserRole.STUDENT,
-      provider: AuthProvider.GOOGLE,
-      googleId: profile.googleId,
-      avatarUrl: profile.avatarUrl,
-      // Google has already proven ownership of the address.
-      emailVerified: true,
-      passwordHash: null,
     });
     return this.repo.save(user);
   }
@@ -207,7 +163,6 @@ export class UsersService {
       name: user.name,
       email: user.email,
       emailVerified: user.emailVerified,
-      provider: user.provider,
       createdAt: user.createdAt,
     }));
 

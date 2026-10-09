@@ -15,7 +15,7 @@ import type { AppConfig, AuthConfig } from '../../config/configuration';
 import { MailService } from '../../mail/mail.service';
 import { User } from '../users/entities/user.entity';
 import { toSafeUser, type SafeUser } from '../users/user.mapper';
-import { UsersService, type GoogleProfileData } from '../users/users.service';
+import { UsersService } from '../users/users.service';
 import { AuthErrorCode } from './auth.constants';
 import { RefreshToken } from './entities/refresh-token.entity';
 import type { JwtPayload } from './types/jwt-payload.interface';
@@ -149,12 +149,6 @@ export class AuthService {
     return this.issueSession(user, context);
   }
 
-  async loginWithGoogle(profile: GoogleProfileData, context: SessionContext): Promise<LoginResult> {
-    const user = await this.users.findOrCreateGoogleUser(profile);
-    // No email-verified gate: Google already proved ownership of the address.
-    return this.issueSession(user, context);
-  }
-
   // Rotation makes a token single-use — the row is deleted on redemption, so a replayed stolen token just misses.
   async refresh(rawRefreshToken: string, context: SessionContext): Promise<LoginResult> {
     const tokenHash = this.hashToken(rawRefreshToken);
@@ -213,11 +207,6 @@ export class AuthService {
       return;
     }
 
-    // Google-only accounts have no password to reset; sending a link would let anyone with that mailbox attach a password to it.
-    if (!(await this.hasPassword(user.email))) {
-      return;
-    }
-
     const rawToken = randomBytes(32).toString('hex');
 
     user.passwordResetTokenHash = this.hashToken(rawToken);
@@ -254,10 +243,9 @@ export class AuthService {
     await this.mail.sendPasswordChanged(user.email);
   }
 
-  // Changes the password of a signed-in user, or sets the first one for a Google-only account.
   async changePassword(
     userId: string,
-    currentPassword: string | undefined,
+    currentPassword: string,
     newPassword: string,
   ): Promise<void> {
     const user = await this.users.findById(userId);
@@ -268,19 +256,15 @@ export class AuthService {
 
     const withSecrets = await this.users.findByEmailWithSecrets(user.email);
 
-    if (withSecrets?.passwordHash) {
-      if (!currentPassword) {
-        throw new BadRequestException('Current password is required');
-      }
-      const matches = await bcrypt.compare(currentPassword, withSecrets.passwordHash);
-      if (!matches) {
-        // 400, not 401: a 401 would make the client try to refresh its session.
-        throw new BadRequestException({
-          message: 'Current password is incorrect',
-          error: 'Bad Request',
-          code: AuthErrorCode.INVALID_CREDENTIALS,
-        });
-      }
+    const matches =
+      !!withSecrets?.passwordHash && (await bcrypt.compare(currentPassword, withSecrets.passwordHash));
+    if (!matches) {
+      // 400, not 401: a 401 would make the client try to refresh its session.
+      throw new BadRequestException({
+        message: 'Current password is incorrect',
+        error: 'Bad Request',
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+      });
     }
 
     user.passwordHash = await this.users.hashPassword(newPassword);
@@ -289,11 +273,6 @@ export class AuthService {
     // Same reasoning as resetPassword: the usual reason to change a password is suspecting someone else has a session.
     await this.logoutAll(user.id);
     await this.mail.sendPasswordChanged(user.email);
-  }
-
-  async hasPassword(email: string): Promise<boolean> {
-    const user = await this.users.findByEmailWithSecrets(email);
-    return !!user?.passwordHash;
   }
 
   /** Update the signed-in user's display name. Email stays immutable here by design. */
