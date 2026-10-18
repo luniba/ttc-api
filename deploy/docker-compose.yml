@@ -1,0 +1,89 @@
+# Production stack for ttc-api. CI copies this file to /var/www/ttc/ttc-api/
+# on every deploy. Secret-free: every credential comes from ./.env on the server.
+# The repo-root docker-compose.yml is local dev infra only. Never ship that one.
+name: ttc-api-prod
+
+services:
+  api:
+    image: ghcr.io/luniba/ttc-api:latest
+    container_name: ttc-api
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5010:5010"
+    networks:
+      - backend
+      - web
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ttc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ttc-api-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: ttc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - ttc-api-redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    container_name: ttc-minio
+    restart: unless-stopped
+    command: server /data --console-address "127.0.0.1:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ttc-api-miniodata:/data
+    ports:
+      - "127.0.0.1:9010:9000"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+      - web
+
+networks:
+  backend:
+  web:
+    external: true
+
+volumes:
+  ttc-api-pgdata:
+  ttc-api-redisdata:
+  ttc-api-miniodata:
