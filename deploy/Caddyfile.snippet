@@ -1,0 +1,9 @@
+# Append to ~/infra/Caddyfile on the server.
+api-v2.tesolteflcouncil.com {
+    reverse_proxy ttc-api:5010
+}
+
+# Public media (MinIO public bucket).
+v2-media.tesolteflcouncil.com {
+    reverse_proxy ttc-minio:9000
+}
