@@ -3,7 +3,6 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import configuration from '../config/configuration';
-import { generateCertificateId } from '../modules/candidates/certificate-id';
 import { Candidate } from '../modules/candidates/entities/candidate.entity';
 import { CourseCategory } from '../modules/courses/entities/course-category.entity';
 import { CourseModule } from '../modules/courses/entities/course-module.entity';
@@ -76,32 +75,25 @@ async function importCertificates(): Promise<void> {
         continue;
       }
 
-      // Retry only on a certificate-ID clash (unique index); anything else is a real error.
-      for (let attempt = 0; ; attempt++) {
-        try {
-          await repo.insert({
-            certificateId: generateCertificateId(),
-            certificateNo,
-            passportName: row.passport_name.trim(),
-            passportNo: row.passport_number.trim(),
-            dateOfBirth: row.date_of_birth,
-            address: row.address.trim(),
-            // Column is NOT NULL; one legacy record has no email.
-            email: (row.email ?? '').trim().toLowerCase(),
-            courseId,
-            issueDate: row.issue_date,
-            nationality: row.nationality.trim(),
-            // Already issued and in circulation, so the public check should accept them.
-            isVerified: true,
-            verifiedAt: new Date(`${row.issue_date}T00:00:00Z`),
-          });
-          created++;
-          break;
-        } catch (err) {
-          const constraint = (err as { constraint?: string }).constraint;
-          if (constraint !== 'uq_candidates_certificate_id' || attempt >= 4) throw err;
-        }
-      }
+      // Legacy certificates keep the number printed on them as their public certificate ID, so existing holders verify with what
+      // they already have. Both columns are unique, and the old numbers are, so there is no clash to retry.
+      await repo.insert({
+        certificateId: certificateNo,
+        certificateNo,
+        passportName: row.passport_name.trim(),
+        passportNo: row.passport_number.trim(),
+        dateOfBirth: row.date_of_birth,
+        address: row.address.trim(),
+        // Column is NOT NULL; one legacy record has no email.
+        email: (row.email ?? '').trim().toLowerCase(),
+        courseId,
+        issueDate: row.issue_date,
+        nationality: row.nationality.trim(),
+        // Already issued and in circulation, so the public check should accept them.
+        isVerified: true,
+        verifiedAt: new Date(`${row.issue_date}T00:00:00Z`),
+      });
+      created++;
     }
 
     console.log(`${dryRun ? '[dry run] would create' : 'Created'} ${created}, skipped ${skipped} existing, of ${rows.length}.`);
