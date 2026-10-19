@@ -10,13 +10,15 @@ import { CourseCategory } from '../modules/courses/entities/course-category.enti
 import { CourseModule } from '../modules/courses/entities/course-module.entity';
 import { Course } from '../modules/courses/entities/course.entity';
 import { ModuleMaterial } from '../modules/courses/entities/module-material.entity';
+import { QuizQuestion } from '../modules/courses/entities/quiz-question.entity';
 import { S3StorageService } from '../storage/s3-storage.service';
 
-// The six launch courses from the old WordPress site (mirrors frontend-lms/content/courses.ts). Idempotent: categories are
+// The six launch courses from the old WordPress site (mirrors the client's course content). Idempotent: categories are
 // matched by name, and a course whose slug already exists (soft-deleted included) is skipped. Run with: npm run seed:courses
 loadEnv();
 
-const IMAGES_DIR = resolve(__dirname, '../../../frontend-lms/public/images');
+// Override with SEED_IMAGES_DIR when running in the container, where the client repo isn't next to the API.
+const IMAGES_DIR = process.env.SEED_IMAGES_DIR ?? resolve(__dirname, '../../../ttc-client/public/images');
 
 const TESOL_TEFL = 'TESOL & TEFL';
 const SPORTS = 'Sports coach certification';
@@ -141,7 +143,7 @@ async function seedCourses(): Promise<void> {
     type: 'postgres',
     url: config.database.url,
     ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-    entities: [CourseCategory, Course, CourseModule, ModuleMaterial],
+    entities: [CourseCategory, Course, CourseModule, ModuleMaterial, QuizQuestion],
     synchronize: false,
   });
   await dataSource.initialize();
