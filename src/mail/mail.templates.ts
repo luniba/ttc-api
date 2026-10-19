@@ -75,3 +75,42 @@ export const welcomeTemplate = (name: string): EmailContent => ({
     `<p>Hi ${escape(name)},</p><p>Your email is confirmed and your account is ready to use.</p>`,
   ),
 });
+
+export interface ContactMessage {
+  name: string;
+  email: string;
+  phone: string | null;
+  course: string | null;
+  message: string;
+  subscribe: boolean;
+}
+
+// Goes to staff, not the sender, and everything in it is visitor-supplied: escaped in the HTML, and the subject has no line breaks so
+// the name can't add headers.
+export const contactMessageTemplate = (m: ContactMessage): EmailContent => {
+  const rows: [string, string][] = [
+    ['Name', m.name],
+    ['Email', m.email],
+    ['Phone', m.phone ?? '—'],
+    ['Course', m.course ?? '—'],
+    ['Newsletter', m.subscribe ? 'Yes, wants to subscribe' : 'No'],
+  ];
+  return {
+    subject: `New contact message from ${m.name}`.replace(/[\r\n]+/g, ' '),
+    text: `${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${m.message}\n\nReply to this email to answer ${m.name}.`,
+    html: layout(
+      'New contact message',
+      `<table style="border-collapse:collapse;width:100%;font-size:14px">
+        ${rows
+          .map(
+            ([k, v]) =>
+              `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;white-space:nowrap">${k}</td><td style="padding:4px 0">${escape(v)}</td></tr>`,
+          )
+          .join('')}
+       </table>
+       <p style="margin:20px 0 4px;color:#6b7280;font-size:13px">Message</p>
+       <p style="white-space:pre-wrap;margin:0">${escape(m.message)}</p>
+       <p style="color:#6b7280;font-size:13px;margin-top:20px">Reply to this email to answer ${escape(m.name)}.</p>`,
+    ),
+  };
+};

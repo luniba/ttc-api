@@ -63,12 +63,20 @@ export interface StorageConfig {
   region: string;
   /** Custom S3 endpoint (MinIO). Undefined for real AWS S3. */
   endpoint?: string;
+  /** Origin that browsers reach MinIO on. Signed URLs must be built against it: the signature covers the host, and `endpoint` is
+   * usually a Docker-internal name (http://minio:9000) that a browser can't resolve. Undefined on AWS, where one endpoint serves both. */
+  signingEndpoint?: string;
   /** MinIO needs path-style addressing; AWS S3 uses virtual-host style. */
   forcePathStyle: boolean;
   accessKeyId?: string;
   secretAccessKey?: string;
   publicUrl: string;
   maxBytes: number;
+}
+
+export interface ContactConfig {
+  // Where contact-form messages are delivered. Empty means the form is unavailable (see ContactService).
+  to: string;
 }
 
 export interface AdminSeedConfig {
@@ -84,6 +92,7 @@ export interface Configuration {
   auth: AuthConfig;
   mail: MailConfig;
   storage: StorageConfig;
+  contact: ContactConfig;
   adminSeed: AdminSeedConfig;
 }
 
@@ -171,6 +180,9 @@ export default (): Configuration => {
       region: isMinio ? 'us-east-1' : (process.env.AWS_REGION ?? 'ap-south-1'),
       endpoint: isMinio ? (process.env.MINIO_ENDPOINT ?? 'http://localhost:9000') : undefined,
       forcePathStyle: isMinio,
+      signingEndpoint: isMinio
+        ? trimUrl(process.env.MINIO_PUBLIC_URL ?? process.env.MINIO_ENDPOINT ?? 'http://localhost:9000')
+        : undefined,
       // Left undefined on AWS so the SDK falls back to the instance/task IAM role.
       accessKeyId: isMinio
         ? (process.env.MINIO_ACCESS_KEY ?? 'minioadmin')
@@ -185,6 +197,11 @@ export default (): Configuration => {
               `https://${bucket}.s3.${process.env.AWS_REGION ?? 'ap-south-1'}.amazonaws.com`,
           ),
       maxBytes: int(process.env.UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
+    },
+
+    contact: {
+      // Falls back to the admin account's address so a fresh deploy delivers somewhere without extra setup.
+      to: (process.env.CONTACT_TO_EMAIL || process.env.ADMIN_EMAIL || '').trim(),
     },
 
     adminSeed: {

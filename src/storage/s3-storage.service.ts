@@ -21,14 +21,16 @@ export class S3StorageService extends StorageService implements OnModuleInit {
   private readonly logger = new Logger(S3StorageService.name);
   private readonly cfg: StorageConfig;
   private readonly client: S3Client;
+  // Same bucket and credentials, but addressed the way a browser reaches it, so signed URLs are usable outside Docker. Presigning is
+  // offline (no request is made), so this client never needs to connect to anything.
+  private readonly signer: S3Client;
 
   constructor(config: ConfigService) {
     super();
     this.cfg = config.getOrThrow<StorageConfig>('storage');
 
-    this.client = new S3Client({
+    const clientConfig = {
       region: this.cfg.region,
-      endpoint: this.cfg.endpoint,
       forcePathStyle: this.cfg.forcePathStyle,
       // Omitted on AWS so the SDK's default chain picks up the task/instance IAM role — no long-lived keys to leak.
       credentials:
@@ -38,7 +40,9 @@ export class S3StorageService extends StorageService implements OnModuleInit {
               secretAccessKey: this.cfg.secretAccessKey,
             }
           : undefined,
-    });
+    };
+    this.client = new S3Client({ ...clientConfig, endpoint: this.cfg.endpoint });
+    this.signer = new S3Client({ ...clientConfig, endpoint: this.cfg.signingEndpoint ?? this.cfg.endpoint });
   }
 
   async onModuleInit(): Promise<void> {
@@ -91,7 +95,7 @@ export class S3StorageService extends StorageService implements OnModuleInit {
 
   getSignedUrl(key: string, expiresInSeconds = 900): Promise<string> {
     return getSignedUrl(
-      this.client,
+      this.signer,
       new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }),
       { expiresIn: expiresInSeconds },
     );
@@ -119,7 +123,7 @@ export class S3StorageService extends StorageService implements OnModuleInit {
 
   getPrivateDownloadUrl(key: string, fileName: string, expiresInSeconds = 600): Promise<string> {
     return getSignedUrl(
-      this.client,
+      this.signer,
       new GetObjectCommand({
         Bucket: this.cfg.privateBucket,
         Key: key,

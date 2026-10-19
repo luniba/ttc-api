@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { createTransport, type Transporter } from 'nodemailer';
 import type { MailConfig } from '../config/configuration';
 import {
+  contactMessageTemplate,
   passwordChangedTemplate,
   passwordResetTemplate,
   verifyEmailTemplate,
   welcomeTemplate,
+  type ContactMessage,
   type EmailContent,
 } from './mail.templates';
 
@@ -51,28 +53,41 @@ export class MailService {
     return this.send(to, welcomeTemplate(name));
   }
 
+  // Unlike the account emails, the sender is waiting on this one, so the result is returned: false means it was not delivered.
+  // Reply-To is the visitor, so staff answer straight from their inbox.
+  sendContactMessage(to: string, message: ContactMessage): Promise<boolean> {
+    return this.deliver(to, contactMessageTemplate(message), message.email);
+  }
+
   private async send(to: string, content: EmailContent): Promise<void> {
+    await this.deliver(to, content);
+  }
+
+  private async deliver(to: string, content: EmailContent, replyTo?: string): Promise<boolean> {
     if (!this.transporter) {
       this.logger.warn(`[DEV] Email to ${to} — ${content.subject}\n${content.text}`);
-      return;
+      return true;
     }
 
     try {
       await this.transporter.sendMail({
         from: this.from,
         to,
+        replyTo,
         subject: content.subject,
         text: content.text,
         html: content.html,
       });
       this.logger.log(`Sent "${content.subject}" to ${to}`);
+      return true;
     } catch (error) {
-      // Swallowed on purpose: the caller's operation already succeeded, and a bounced SMTP connection shouldn't surface as a 500.
+      // Not rethrown: for account emails the caller's operation already succeeded, and a bounced SMTP connection shouldn't surface as a 500.
       this.logger.error(
         `Failed to send "${content.subject}" to ${to}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      return false;
     }
   }
 }
