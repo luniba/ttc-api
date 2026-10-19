@@ -61,8 +61,8 @@ export class ModulesService {
     private readonly dataSource: DataSource,
   ) {}
 
-  private sign = (key: string, fileName: string): Promise<string> =>
-    this.storage.getPrivateDownloadUrl(key, fileName, DOWNLOAD_URL_TTL_SECONDS);
+  private sign = (key: string, fileName: string, disposition: 'attachment' | 'inline'): Promise<string> =>
+    this.storage.getPrivateDownloadUrl(key, fileName, DOWNLOAD_URL_TTL_SECONDS, disposition);
 
   // ---- Modules -------------------------------------------------------------
 

@@ -31,11 +31,15 @@ export abstract class StorageService {
   // Private bucket (paid course materials): never publicly readable, only via signed URLs.
   abstract uploadPrivate(input: UploadInput): Promise<Omit<UploadResult, 'url'>>;
 
-  /** Signed GET on the private bucket that downloads as `fileName` (Content-Disposition: attachment). */
+  /**
+   * Signed GET on the private bucket, named `fileName`. `attachment` (default) makes the browser download it; `inline` lets the
+   * browser show it (a PDF opens in the viewer) while keeping `fileName` for a later "save as".
+   */
   abstract getPrivateDownloadUrl(
     key: string,
     fileName: string,
     expiresInSeconds?: number,
+    disposition?: 'attachment' | 'inline',
   ): Promise<string>;
 
   abstract deletePrivate(key: string): Promise<void>;

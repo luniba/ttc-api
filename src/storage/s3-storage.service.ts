@@ -121,13 +121,18 @@ export class S3StorageService extends StorageService implements OnModuleInit {
     return { key, size: input.buffer.byteLength, mimeType: input.mimeType };
   }
 
-  getPrivateDownloadUrl(key: string, fileName: string, expiresInSeconds = 600): Promise<string> {
+  getPrivateDownloadUrl(
+    key: string,
+    fileName: string,
+    expiresInSeconds = 600,
+    disposition: 'attachment' | 'inline' = 'attachment',
+  ): Promise<string> {
     return getSignedUrl(
       this.signer,
       new GetObjectCommand({
         Bucket: this.cfg.privateBucket,
         Key: key,
-        ResponseContentDisposition: contentDisposition(fileName),
+        ResponseContentDisposition: contentDisposition(fileName, disposition),
       }),
       { expiresIn: expiresInSeconds },
     );
@@ -178,9 +183,9 @@ export class S3StorageService extends StorageService implements OnModuleInit {
 }
 
 // ASCII fallback in filename= for old clients, the real (possibly non-ASCII) name in filename* (RFC 6266).
-const contentDisposition = (fileName: string): string => {
+const contentDisposition = (fileName: string, disposition: 'attachment' | 'inline'): string => {
   const ascii = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
 };
 
 const describe = (error: unknown): string =>

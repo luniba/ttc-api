@@ -6,7 +6,7 @@ import type { QuizQuestion } from './entities/quiz-question.entity';
 
 // Explicit allow-lists rather than returning entities, so a new column doesn't leak the day it's added. Shapes are the contract in docs/courses-api.md.
 export type UrlResolver = (key: string) => string;
-export type SignedUrlResolver = (key: string, fileName: string) => Promise<string>;
+export type SignedUrlResolver = (key: string, fileName: string, disposition: 'attachment' | 'inline') => Promise<string>;
 
 export interface CategoryDto {
   id: string;
@@ -63,8 +63,10 @@ export interface MaterialDto {
   fileName: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
-  /** file: signed URL (~10 min); link: the stored URL. */
+  /** file: signed URL (~10 min) that opens in the browser (a PDF shows in the viewer); link: the stored URL. */
   url: string;
+  /** file: signed URL (~10 min) that downloads it; null for links. */
+  downloadUrl: string | null;
 }
 
 export interface ModuleDto extends ModuleSummary {
@@ -123,8 +125,12 @@ export const toMaterialDto = async (
   sizeBytes: material.sizeBytes,
   url:
     material.type === MaterialType.FILE
-      ? await sign(material.fileKey!, material.fileName ?? material.title)
+      ? await sign(material.fileKey!, material.fileName ?? material.title, 'inline')
       : material.url!,
+  downloadUrl:
+    material.type === MaterialType.FILE
+      ? await sign(material.fileKey!, material.fileName ?? material.title, 'attachment')
+      : null,
 });
 
 const toQuestionDto = (q: QuizQuestion, withAnswers: boolean): QuizQuestionDto => ({
