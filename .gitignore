@@ -9,3 +9,6 @@ coverage/
 
 .DS_Store
 *.log
+
+# WP import data (contains passport numbers / PII)
+data/

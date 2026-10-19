@@ -24,6 +24,7 @@
     "migration:show": "npm run typeorm -- migration:show",
     "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "seed:courses": "ts-node src/scripts/seed-courses.ts",
+    "import:wp-certificates": "ts-node src/scripts/import-wp-certificates.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
