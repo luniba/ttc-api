@@ -25,6 +25,7 @@
     "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "seed:courses": "ts-node src/scripts/seed-courses.ts",
     "import:wp-certificates": "ts-node src/scripts/import-wp-certificates.ts",
+    "import:wp-modules": "ts-node src/scripts/import-wp-modules.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
