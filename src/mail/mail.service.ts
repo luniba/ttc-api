@@ -3,13 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { createTransport, type Transporter } from 'nodemailer';
 import type { MailConfig } from '../config/configuration';
 import {
+  checkoutConfirmationTemplate,
+  contactConfirmationTemplate,
   contactMessageTemplate,
   passwordChangedTemplate,
   passwordResetTemplate,
+  purchaseRequestTemplate,
   verifyEmailTemplate,
   welcomeTemplate,
   type ContactMessage,
   type EmailContent,
+  type PurchaseRequest,
 } from './mail.templates';
 
 // Locally points at mailpit, which captures everything and delivers nothing. If SMTP_HOST is unset, degrades to logging instead of
@@ -57,6 +61,21 @@ export class MailService {
   // Reply-To is the visitor, so staff answer straight from their inbox.
   sendContactMessage(to: string, message: ContactMessage): Promise<boolean> {
     return this.deliver(to, contactMessageTemplate(message), message.email);
+  }
+
+  // Staff notification for a website purchase request; Reply-To is the candidate. False means it wasn't delivered.
+  sendPurchaseRequest(to: string, request: PurchaseRequest): Promise<boolean> {
+    return this.deliver(to, purchaseRequestTemplate(request), request.email);
+  }
+
+  // Receipts for the person who filled in a form. Best effort: the request itself is already safe, so a failure is only logged.
+  // Replies go to the team (`replyTo`) because the From address is a no-reply.
+  async sendCheckoutConfirmation(to: string, name: string, course: string, phone: string, replyTo: string): Promise<void> {
+    await this.deliver(to, checkoutConfirmationTemplate(name, course, phone), replyTo || undefined);
+  }
+
+  async sendContactConfirmation(to: string, name: string, phone: string, replyTo: string): Promise<void> {
+    await this.deliver(to, contactConfirmationTemplate(name, phone), replyTo || undefined);
   }
 
   private async send(to: string, content: EmailContent): Promise<void> {

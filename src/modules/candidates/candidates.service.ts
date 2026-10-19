@@ -119,7 +119,7 @@ export class CandidatesService {
       await this.repo.save(candidate);
     } catch (error) {
       if (violatedIndex(error) === 'uq_candidates_certificate_no') {
-        throw certificateNoTaken(candidate.certificateNo);
+        throw certificateNoTaken(candidate.certificateNo ?? '');
       }
       throw error;
     }
@@ -130,6 +130,10 @@ export class CandidatesService {
   async verify(id: string): Promise<CandidateDto> {
     const candidate = await this.repo.findOne({ where: { id } });
     if (!candidate) throw new NotFoundException('Candidate not found');
+    // A website purchase request has no certificate yet; verifying it would publish a certificate that doesn't exist.
+    if (!candidate.certificateNo || !candidate.issueDate) {
+      throw new BadRequestException('Add the certificate number and issue date before verifying this candidate.');
+    }
     if (!candidate.isVerified) {
       await this.repo.update(id, { isVerified: true, verifiedAt: new Date() });
     }
@@ -156,7 +160,8 @@ export class CandidatesService {
       certificateId: candidate.certificateId,
       holderName: candidate.passportName,
       courseTitle: candidate.course.title,
-      issuedAt: candidate.issueDate,
+      // Verified candidates always have one (see verify()).
+      issuedAt: candidate.issueDate ?? '',
     };
   }
 

@@ -6,7 +6,7 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { TrimmedString } from '../../../common/decorators/trimmed-string.decorator';
 
 // A calendar day with no time or zone, as <input type="date"> sends it. strict rejects 2026-02-30.
-const CalendarDay = () =>
+export const CalendarDay = () =>
   applyDecorators(
     Matches(/^\d{4}-\d{2}-\d{2}$/, { message: '$property must be a date as YYYY-MM-DD' }),
     IsISO8601({ strict: true }, { message: '$property must be a real calendar date' }),

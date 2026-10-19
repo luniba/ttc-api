@@ -25,9 +25,11 @@ export class Candidate {
   certificateId!: string;
 
   // Typed by the admin from the printed certificate.
+  // Null while the candidate is only a purchase request from the website; the admin fills it in when the certificate is issued.
+  // Unique still holds (Postgres allows many NULLs).
   @Index('uq_candidates_certificate_no', { unique: true })
-  @Column({ name: 'certificate_no', type: 'varchar', length: 60 })
-  certificateNo!: string;
+  @Column({ name: 'certificate_no', type: 'varchar', length: 60, nullable: true })
+  certificateNo!: string | null;
 
   @Column({ name: 'passport_name', type: 'varchar', length: 160 })
   passportName!: string;
@@ -55,8 +57,8 @@ export class Candidate {
   @JoinColumn({ name: 'course_id' })
   course!: Course;
 
-  @Column({ name: 'issue_date', type: 'date' })
-  issueDate!: string;
+  @Column({ name: 'issue_date', type: 'date', nullable: true })
+  issueDate!: string | null;
 
   @Column({ type: 'varchar', length: 80 })
   nationality!: string;

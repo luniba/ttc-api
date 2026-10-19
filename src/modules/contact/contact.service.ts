@@ -11,13 +11,16 @@ import { ContactDto } from './dto/contact.dto';
 export class ContactService {
   private readonly logger = new Logger(ContactService.name);
   private readonly to: string;
+  private readonly phone: string;
 
   constructor(
     config: ConfigService,
     private readonly mail: MailService,
     @InjectRepository(Course) private readonly courses: Repository<Course>,
   ) {
-    this.to = config.getOrThrow<ContactConfig>('contact').to;
+    const contact = config.getOrThrow<ContactConfig>('contact');
+    this.to = contact.to;
+    this.phone = contact.phone;
   }
 
   // Fails loudly (503) rather than pretending: a visitor who sees "sent" for a message nobody received is worse than an error.
@@ -41,5 +44,12 @@ export class ContactService {
       subscribe: dto.subscribe,
     });
     if (!sent) throw new ServiceUnavailableException('We couldn’t send your message. Please try again in a moment.');
+
+    // A receipt for the sender, after the team's copy is safely out; its failure never fails the request.
+    this.mail
+      .sendContactConfirmation(dto.email, dto.firstName, this.phone, this.to)
+      .catch((error: unknown) =>
+        this.logger.error(`Contact confirmation email failed: ${error instanceof Error ? error.message : String(error)}`),
+      );
   }
 }

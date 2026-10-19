@@ -114,3 +114,90 @@ export const contactMessageTemplate = (m: ContactMessage): EmailContent => {
     ),
   };
 };
+
+export interface PurchaseRequest {
+  course: string;
+  name: string;
+  email: string;
+  passportNo: string;
+  dateOfBirth: string;
+  nationality: string;
+  address: string;
+  // Where the admin finishes the job: the candidate's page in the admin panel.
+  adminLink: string;
+  // True when this person had already asked for the same course and this updated that request.
+  repeat: boolean;
+}
+
+// Staff-facing and built from visitor input, so escaped like the contact email, with no line breaks in the subject.
+export const purchaseRequestTemplate = (r: PurchaseRequest): EmailContent => {
+  const rows: [string, string][] = [
+    ['Course', r.course],
+    ['Name (passport)', r.name],
+    ['Email', r.email],
+    ['Passport No', r.passportNo],
+    ['Date of birth', r.dateOfBirth],
+    ['Nationality', r.nationality],
+    ['Address', r.address],
+  ];
+  const note = r.repeat ? 'They had already asked for this course; their details were updated, no second record was added.' : '';
+  return {
+    subject: `Course purchase request: ${r.course} (${r.name})`.replace(/[\r\n]+/g, ' '),
+    text: `${r.name} has requested to purchase "${r.course}".\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${note ? `${note}\n\n` : ''}Open the candidate in the admin panel:\n${r.adminLink}\n\nReply to this email to contact ${r.name}.`,
+    html: layout(
+      'New course purchase request',
+      `<p><strong>${escape(r.name)}</strong> has requested to purchase <strong>${escape(r.course)}</strong>.</p>
+       <table style="border-collapse:collapse;width:100%;font-size:14px">
+        ${rows
+          .map(
+            ([k, v]) =>
+              `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0">${escape(v)}</td></tr>`,
+          )
+          .join('')}
+       </table>
+       ${note ? `<p style="color:#6b7280;font-size:13px">${escape(note)}</p>` : ''}
+       ${button(r.adminLink, 'Open in admin panel')}
+       <p style="color:#6b7280;font-size:13px">Reply to this email to contact ${escape(r.name)}.</p>`,
+    ),
+  };
+};
+
+// Sent to the person who filled in a form. `name` and `course` are visitor/DB text, so escaped; `phone` comes from config.
+const urgentLine = (phone: string): { text: string; html: string } =>
+  phone
+    ? {
+        text: `If it's urgent, call us on ${phone}.`,
+        html: `If it's urgent, call us on <strong>${escape(phone)}</strong>.`,
+      }
+    : {
+        text: `If it's urgent, just reply to this email.`,
+        html: `If it's urgent, just reply to this email.`,
+      };
+
+export const checkoutConfirmationTemplate = (name: string, course: string, phone: string): EmailContent => {
+  const urgent = urgentLine(phone);
+  return {
+    subject: `We've received your request: ${course}`.replace(/[\r\n]+/g, ' '),
+    text: `Hi ${name},\n\nThanks for requesting "${course}". We've notified our team and they will contact you very soon to complete your enrolment. No payment has been taken.\n\n${urgent.text}\n\n— ${BRAND}`,
+    html: layout(
+      'We\'ve received your request',
+      `<p>Hi ${escape(name)},</p>
+       <p>Thanks for requesting <strong>${escape(course)}</strong>. We've notified our team and they will contact you very soon to complete your enrolment. No payment has been taken.</p>
+       <p style="color:#6b7280;font-size:13px">${urgent.html}</p>`,
+    ),
+  };
+};
+
+export const contactConfirmationTemplate = (name: string, phone: string): EmailContent => {
+  const urgent = urgentLine(phone);
+  return {
+    subject: `We've received your message`,
+    text: `Hi ${name},\n\nThanks for getting in touch. We've received your message and will reply within one or two working days.\n\n${urgent.text}\n\n— ${BRAND}`,
+    html: layout(
+      'We\'ve received your message',
+      `<p>Hi ${escape(name)},</p>
+       <p>Thanks for getting in touch. We've received your message and will reply within one or two working days.</p>
+       <p style="color:#6b7280;font-size:13px">${urgent.html}</p>`,
+    ),
+  };
+};

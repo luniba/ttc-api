@@ -77,6 +77,8 @@ export interface StorageConfig {
 export interface ContactConfig {
   // Where contact-form messages are delivered. Empty means the form is unavailable (see ContactService).
   to: string;
+  // Optional number for the "urgent" line in confirmation emails; the line points to a reply when empty.
+  phone: string;
 }
 
 export interface AdminSeedConfig {
@@ -202,6 +204,7 @@ export default (): Configuration => {
     contact: {
       // Falls back to the admin account's address so a fresh deploy delivers somewhere without extra setup.
       to: (process.env.CONTACT_TO_EMAIL || process.env.ADMIN_EMAIL || '').trim(),
+      phone: (process.env.CONTACT_PHONE ?? '').trim(),
     },
 
     adminSeed: {

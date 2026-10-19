@@ -4,14 +4,15 @@ import type { Candidate } from './entities/candidate.entity';
 export interface CandidateDto {
   id: string;
   certificateId: string;
-  certificateNo: string;
+  // Null for a purchase request that hasn't been issued a certificate yet.
+  certificateNo: string | null;
   passportName: string;
   passportNo: string;
   dateOfBirth: string;
   address: string;
   email: string;
   course: { id: string; title: string };
-  issueDate: string;
+  issueDate: string | null;
   nationality: string;
   isVerified: boolean;
   verifiedAt: Date | null;

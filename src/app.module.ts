@@ -17,6 +17,7 @@ import { MailModule } from './mail/mail.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CandidatesModule } from './modules/candidates/candidates.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -62,6 +63,7 @@ import { StorageModule } from './storage/storage.module';
     UploadsModule,
     CoursesModule,
     CandidatesModule,
+    CheckoutModule,
     ContactModule,
     OrdersModule,
     HealthModule,
