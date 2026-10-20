@@ -44,6 +44,11 @@ export class User {
   })
   passwordHash!: string | null;
 
+  // Optional login name; null means sign in with the email.
+  @Index('uq_users_username_lower', { synchronize: false })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  username!: string | null;
+
   @Column({ type: 'varchar', length: 120, default: '' })
   name!: string;
 
@@ -52,6 +57,10 @@ export class User {
 
   @Column({ name: 'email_verified', type: 'boolean', default: false })
   emailVerified!: boolean;
+
+  // Encrypted starting password so an admin can read it back; cleared when the student sets their own.
+  @Column({ name: 'temp_password_enc', type: 'varchar', length: 512, nullable: true, select: false })
+  tempPasswordEnc!: string | null;
 
   @Column({
     name: 'email_verify_token_hash',

@@ -13,7 +13,7 @@ export class CheckoutController {
   @Post()
   @Public()
   @HttpCode(HttpStatus.OK)
-  // Anonymous, writes a row and sends email: a tight per-IP cap.
+  // Public: tight per-IP cap.
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @ApiOperation({
     summary: 'Request to purchase a course',

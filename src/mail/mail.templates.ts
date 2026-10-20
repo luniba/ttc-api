@@ -85,8 +85,7 @@ export interface ContactMessage {
   subscribe: boolean;
 }
 
-// Goes to staff, not the sender, and everything in it is visitor-supplied: escaped in the HTML, and the subject has no line breaks so
-// the name can't add headers.
+// Staff-facing: escaped, and no line breaks in the subject.
 export const contactMessageTemplate = (m: ContactMessage): EmailContent => {
   const rows: [string, string][] = [
     ['Name', m.name],
@@ -123,13 +122,12 @@ export interface PurchaseRequest {
   dateOfBirth: string;
   nationality: string;
   address: string;
-  // Where the admin finishes the job: the candidate's page in the admin panel.
+  // The candidate's page in the admin panel.
   adminLink: string;
-  // True when this person had already asked for the same course and this updated that request.
+  // They asked for this course before; their request was updated.
   repeat: boolean;
 }
 
-// Staff-facing and built from visitor input, so escaped like the contact email, with no line breaks in the subject.
 export const purchaseRequestTemplate = (r: PurchaseRequest): EmailContent => {
   const rows: [string, string][] = [
     ['Course', r.course],
@@ -162,7 +160,7 @@ export const purchaseRequestTemplate = (r: PurchaseRequest): EmailContent => {
   };
 };
 
-// Sent to the person who filled in a form. `name` and `course` are visitor/DB text, so escaped; `phone` comes from config.
+// Receipt for the person who filled in a form.
 const urgentLine = (phone: string): { text: string; html: string } =>
   phone
     ? {
@@ -174,15 +172,42 @@ const urgentLine = (phone: string): { text: string; html: string } =>
         html: `If it's urgent, just reply to this email.`,
       };
 
-export const checkoutConfirmationTemplate = (name: string, course: string, phone: string): EmailContent => {
+// A new account (with its password) or one they already had.
+export type CheckoutAccess =
+  | { kind: 'created'; username: string; password: string; loginUrl: string; resetUrl: string }
+  | { kind: 'existing'; loginUrl: string; resetUrl: string };
+
+export const checkoutConfirmationTemplate = (
+  name: string,
+  course: string,
+  phone: string,
+  access: CheckoutAccess,
+): EmailContent => {
   const urgent = urgentLine(phone);
+  const loginText =
+    access.kind === 'created'
+      ? `Meanwhile, you can log in to our system with these details:\n\n  Username: ${access.username}\n  Password: ${access.password}\n\nLog in here: ${access.loginUrl}\nYou can change your password at any time with "Forgot password" on the login page: ${access.resetUrl}`
+      : `You already have an account with us, so you can log in as usual: ${access.loginUrl}\nIf you've forgotten your password, reset it here: ${access.resetUrl}`;
+  const loginHtml =
+    access.kind === 'created'
+      ? `<p>Meanwhile, you can log in to our system with these details:</p>
+         <table style="border-collapse:collapse;background:#f3f4f6;border-radius:6px;width:100%;font-size:14px">
+           <tr><td style="padding:10px 12px;color:#6b7280;white-space:nowrap">Username</td><td style="padding:10px 12px"><strong>${escape(access.username)}</strong></td></tr>
+           <tr><td style="padding:10px 12px;color:#6b7280;white-space:nowrap">Password</td><td style="padding:10px 12px"><strong style="font-family:ui-monospace,monospace">${escape(access.password)}</strong></td></tr>
+         </table>
+         ${button(access.loginUrl, 'Log in')}
+         <p style="color:#6b7280;font-size:13px">You can change your password at any time with "Forgot password" on the login page, or <a href="${escape(access.resetUrl)}">right here</a>.</p>`
+      : `<p>You already have an account with us, so you can log in as usual.</p>
+         ${button(access.loginUrl, 'Log in')}
+         <p style="color:#6b7280;font-size:13px">Forgotten your password? <a href="${escape(access.resetUrl)}">Reset it here</a>.</p>`;
   return {
     subject: `We've received your request: ${course}`.replace(/[\r\n]+/g, ' '),
-    text: `Hi ${name},\n\nThanks for requesting "${course}". We've notified our team and they will contact you very soon to complete your enrolment. No payment has been taken.\n\n${urgent.text}\n\n— ${BRAND}`,
+    text: `Hi ${name},\n\nThanks for requesting "${course}". We've received your request, and our team will contact you very soon to complete your enrolment. No payment has been taken.\n\n${loginText}\n\n${urgent.text}\n\n— ${BRAND}`,
     html: layout(
       'We\'ve received your request',
       `<p>Hi ${escape(name)},</p>
-       <p>Thanks for requesting <strong>${escape(course)}</strong>. We've notified our team and they will contact you very soon to complete your enrolment. No payment has been taken.</p>
+       <p>Thanks for requesting <strong>${escape(course)}</strong>. We've received your request, and our team will contact you very soon to complete your enrolment. No payment has been taken.</p>
+       ${loginHtml}
        <p style="color:#6b7280;font-size:13px">${urgent.html}</p>`,
     ),
   };
@@ -201,3 +226,31 @@ export const contactConfirmationTemplate = (name: string, phone: string): EmailC
     ),
   };
 };
+
+export const accessGrantedTemplate = (name: string, course: string, accountUrl: string): EmailContent => ({
+  subject: `You now have access to ${course}`.replace(/[\r\n]+/g, ' '),
+  text: `Hi ${name},\n\nYour access to "${course}" is ready. Log in and open it from My courses:\n${accountUrl}\n\n— ${BRAND}`,
+  html: layout(
+    'Your course is ready',
+    `<p>Hi ${escape(name)},</p>
+     <p>Your access to <strong>${escape(course)}</strong> is ready. Log in and open it from <em>My courses</em>.</p>
+     ${button(accountUrl, 'Go to my courses')}`,
+  ),
+});
+
+// Sent only when an admin ticks "email these details".
+export const loginDetailsTemplate = (name: string, username: string, password: string, loginUrl: string, resetUrl: string): EmailContent => ({
+  subject: `Your ${BRAND} login details`,
+  text: `Hi ${name},\n\nWe've created a login for you:\n\n  Username: ${username}\n  Password: ${password}\n\nLog in here: ${loginUrl}\nYou can change your password at any time with "Forgot password" on the login page: ${resetUrl}\n\n— ${BRAND}`,
+  html: layout(
+    'Your login details',
+    `<p>Hi ${escape(name)},</p>
+     <p>We've created a login for you:</p>
+     <table style="border-collapse:collapse;background:#f3f4f6;border-radius:6px;width:100%;font-size:14px">
+       <tr><td style="padding:10px 12px;color:#6b7280;white-space:nowrap">Username</td><td style="padding:10px 12px"><strong>${escape(username)}</strong></td></tr>
+       <tr><td style="padding:10px 12px;color:#6b7280;white-space:nowrap">Password</td><td style="padding:10px 12px"><strong style="font-family:ui-monospace,monospace">${escape(password)}</strong></td></tr>
+     </table>
+     ${button(loginUrl, 'Log in')}
+     <p style="color:#6b7280;font-size:13px">You can change your password at any time with "Forgot password" on the login page, or <a href="${escape(resetUrl)}">right here</a>.</p>`,
+  ),
+});

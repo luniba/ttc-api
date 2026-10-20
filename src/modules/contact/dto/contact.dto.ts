@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsOptional, MaxLength } from 'class-validator';
 import { TrimmedString } from '../../../common/decorators/trimmed-string.decorator';
 
-// The public contact form. Mirrors the client's payload exactly (forbidNonWhitelisted rejects anything extra).
+// Must match the client's payload exactly.
 export class ContactDto {
   @ApiProperty({ example: 'Jane', maxLength: 80 })
   @TrimmedString(80)

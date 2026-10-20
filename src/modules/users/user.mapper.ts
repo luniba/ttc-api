@@ -4,6 +4,8 @@ import type { User, UserRole } from './entities/user.entity';
 export interface SafeUser {
   id: string;
   email: string;
+  /** The username if set, otherwise the email. */
+  username: string;
   name: string;
   role: UserRole;
   emailVerified: boolean;
@@ -15,6 +17,7 @@ export function toSafeUser(user: User): SafeUser {
   return {
     id: user.id,
     email: user.email,
+    username: user.username ?? user.email,
     name: user.name,
     role: user.role,
     emailVerified: user.emailVerified,

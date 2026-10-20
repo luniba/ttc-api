@@ -21,8 +21,7 @@ export class S3StorageService extends StorageService implements OnModuleInit {
   private readonly logger = new Logger(S3StorageService.name);
   private readonly cfg: StorageConfig;
   private readonly client: S3Client;
-  // Same bucket and credentials, but addressed the way a browser reaches it, so signed URLs are usable outside Docker. Presigning is
-  // offline (no request is made), so this client never needs to connect to anything.
+  // Signs URLs against the public endpoint; presigning makes no request.
   private readonly signer: S3Client;
 
   constructor(config: ConfigService) {

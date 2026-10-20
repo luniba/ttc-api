@@ -42,6 +42,8 @@ export interface AuthConfig {
   resetTtlMinutes: number;
   verifyTtlHours: number;
   bcryptRounds: number;
+  /** Base64 32-byte key for temporary passwords; derived from the JWT secret if empty. */
+  credentialsKey: string;
   requireEmailVerified: boolean;
   cookie: CookieConfig;
 }
@@ -63,8 +65,7 @@ export interface StorageConfig {
   region: string;
   /** Custom S3 endpoint (MinIO). Undefined for real AWS S3. */
   endpoint?: string;
-  /** Origin that browsers reach MinIO on. Signed URLs must be built against it: the signature covers the host, and `endpoint` is
-   * usually a Docker-internal name (http://minio:9000) that a browser can't resolve. Undefined on AWS, where one endpoint serves both. */
+  /** Public origin used for signed URLs (`endpoint` may be Docker-internal). Undefined on AWS. */
   signingEndpoint?: string;
   /** MinIO needs path-style addressing; AWS S3 uses virtual-host style. */
   forcePathStyle: boolean;
@@ -75,9 +76,9 @@ export interface StorageConfig {
 }
 
 export interface ContactConfig {
-  // Where contact-form messages are delivered. Empty means the form is unavailable (see ContactService).
+  // Recipient of contact and checkout emails.
   to: string;
-  // Optional number for the "urgent" line in confirmation emails; the line points to a reply when empty.
+  // Shown in confirmation emails.
   phone: string;
 }
 
@@ -156,6 +157,7 @@ export default (): Configuration => {
       resetTtlMinutes: int(process.env.PASSWORD_RESET_TTL_MIN, 60),
       verifyTtlHours: int(process.env.EMAIL_VERIFY_TTL_HOURS, 24),
       bcryptRounds: int(process.env.BCRYPT_SALT_ROUNDS, 12),
+      credentialsKey: (process.env.CREDENTIALS_ENCRYPTION_KEY ?? '').trim(),
       requireEmailVerified: bool(process.env.REQUIRE_EMAIL_VERIFIED, true),
       cookie: {
         // Never ship non-secure cookies in production, whatever the env says.
@@ -202,7 +204,7 @@ export default (): Configuration => {
     },
 
     contact: {
-      // Falls back to the admin account's address so a fresh deploy delivers somewhere without extra setup.
+      // Falls back to the admin email.
       to: (process.env.CONTACT_TO_EMAIL || process.env.ADMIN_EMAIL || '').trim(),
       phone: (process.env.CONTACT_PHONE ?? '').trim(),
     },

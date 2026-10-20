@@ -11,14 +11,14 @@ export class CertificatesController {
   constructor(private readonly candidates: CandidatesService) {}
 
   @Public()
-  // Every guess needs all three details right; the cap stops anyone grinding through IDs.
+  // Capped: all three details must match.
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Check a certificate',
     description:
-      'Matches name (case and spacing ignored), passport number and certificate ID (case ignored) against verified candidates.',
+      'Matches name (case and spacing ignored), passport number and certificate number (case and spacing ignored) against verified candidates.',
   })
   @ApiNotFoundResponse({ description: 'NOT_FOUND — no verified certificate matches all three. Does not say which field was wrong.' })
   verify(@Body() dto: VerifyCertificateDto): Promise<VerifiedCertificateDto> {

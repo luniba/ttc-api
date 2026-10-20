@@ -11,7 +11,8 @@ export class VerifyCertificateDto {
   @TrimmedString(40)
   passportNumber!: string;
 
-  @ApiProperty({ example: 'kuqwc-tesoltefl-35620', maxLength: 40 })
-  @TrimmedString(40)
-  certificateId!: string;
+  // Free-form: no fixed format.
+  @ApiProperty({ example: 'TTC-257-5084', maxLength: 60 })
+  @TrimmedString(60)
+  certificateNo!: string;
 }

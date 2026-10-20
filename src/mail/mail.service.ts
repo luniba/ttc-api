@@ -3,14 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { createTransport, type Transporter } from 'nodemailer';
 import type { MailConfig } from '../config/configuration';
 import {
+  accessGrantedTemplate,
   checkoutConfirmationTemplate,
   contactConfirmationTemplate,
   contactMessageTemplate,
+  loginDetailsTemplate,
   passwordChangedTemplate,
   passwordResetTemplate,
   purchaseRequestTemplate,
   verifyEmailTemplate,
   welcomeTemplate,
+  type CheckoutAccess,
   type ContactMessage,
   type EmailContent,
   type PurchaseRequest,
@@ -57,21 +60,44 @@ export class MailService {
     return this.send(to, welcomeTemplate(name));
   }
 
-  // Unlike the account emails, the sender is waiting on this one, so the result is returned: false means it was not delivered.
-  // Reply-To is the visitor, so staff answer straight from their inbox.
+  // Returns false when not delivered. Reply-To is the visitor.
   sendContactMessage(to: string, message: ContactMessage): Promise<boolean> {
     return this.deliver(to, contactMessageTemplate(message), message.email);
   }
 
-  // Staff notification for a website purchase request; Reply-To is the candidate. False means it wasn't delivered.
+  // Reply-To is the candidate; false when not delivered.
   sendPurchaseRequest(to: string, request: PurchaseRequest): Promise<boolean> {
     return this.deliver(to, purchaseRequestTemplate(request), request.email);
   }
 
-  // Receipts for the person who filled in a form. Best effort: the request itself is already safe, so a failure is only logged.
-  // Replies go to the team (`replyTo`) because the From address is a no-reply.
-  async sendCheckoutConfirmation(to: string, name: string, course: string, phone: string, replyTo: string): Promise<void> {
-    await this.deliver(to, checkoutConfirmationTemplate(name, course, phone), replyTo || undefined);
+  // Best effort.
+  async sendLoginDetails(
+    to: string,
+    name: string,
+    username: string,
+    password: string,
+    loginUrl: string,
+    resetUrl: string,
+    replyTo: string,
+  ): Promise<boolean> {
+    return this.deliver(to, loginDetailsTemplate(name, username, password, loginUrl, resetUrl), replyTo || undefined);
+  }
+
+  // Best effort.
+  async sendAccessGranted(to: string, name: string, course: string, accountUrl: string, replyTo: string): Promise<void> {
+    await this.deliver(to, accessGrantedTemplate(name, course, accountUrl), replyTo || undefined);
+  }
+
+  // Best effort. Replies go to the team (From is a no-reply).
+  async sendCheckoutConfirmation(
+    to: string,
+    name: string,
+    course: string,
+    phone: string,
+    replyTo: string,
+    access: CheckoutAccess,
+  ): Promise<void> {
+    await this.deliver(to, checkoutConfirmationTemplate(name, course, phone, access), replyTo || undefined);
   }
 
   async sendContactConfirmation(to: string, name: string, phone: string, replyTo: string): Promise<void> {

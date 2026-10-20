@@ -11,6 +11,7 @@ import { basename, extname } from 'path';
 import { DataSource, Repository, type EntityManager } from 'typeorm';
 import { ErrorCode } from '../../common/constants/error-codes';
 import { detectDocumentType } from '../../common/utils/document-signature';
+import { EnrolmentsService } from '../enrolments/enrolments.service';
 import { StorageService } from '../../storage/storage.service';
 import { sanitizeContent } from './content-sanitizer';
 import {
@@ -59,6 +60,7 @@ export class ModulesService {
     @InjectRepository(ModuleMaterial) private readonly materials: Repository<ModuleMaterial>,
     private readonly storage: StorageService,
     private readonly dataSource: DataSource,
+    private readonly enrolments: EnrolmentsService,
   ) {}
 
   private sign = (key: string, fileName: string, disposition: 'attachment' | 'inline'): Promise<string> =>
@@ -88,16 +90,16 @@ export class ModulesService {
   }
 
   // Public preview: published course, module belongs to it, and it's a preview module (or the caller is an admin).
-  async findOnePublic(courseSlug: string, moduleId: string, isAdmin: boolean): Promise<ModuleDto> {
-    const module = await this.loadPublic(courseSlug, moduleId, isAdmin);
+  async findOnePublic(courseSlug: string, moduleId: string, isAdmin: boolean, userId?: string): Promise<ModuleDto> {
+    const module = await this.loadPublic(courseSlug, moduleId, isAdmin, userId);
     // A preview quiz is for trying, so its answers stay on the server.
     return toModuleDto(module, this.sign, isAdmin);
   }
 
   // Scores a try at a quiz the caller may read. Says which answers were right, never what the
   // right answers are, so a preview quiz can be retried honestly.
-  async checkQuiz(courseSlug: string, moduleId: string, dto: CheckQuizDto, isAdmin: boolean): Promise<QuizResult> {
-    const module = await this.loadPublic(courseSlug, moduleId, isAdmin);
+  async checkQuiz(courseSlug: string, moduleId: string, dto: CheckQuizDto, isAdmin: boolean, userId?: string): Promise<QuizResult> {
+    const module = await this.loadPublic(courseSlug, moduleId, isAdmin, userId);
     if (module.type !== ModuleType.QUIZ) throw new BadRequestException('This module is not a quiz');
     const correct = [...module.questions].sort((a, b) => a.position - b.position).map((q) => q.correctIndex);
     if (dto.answers.length !== correct.length) {
@@ -106,7 +108,8 @@ export class ModulesService {
     return scoreQuiz(correct, dto.answers);
   }
 
-  private async loadPublic(courseSlug: string, moduleId: string, isAdmin: boolean): Promise<CourseModule> {
+  // Previews for anyone; the rest for admins and enrolled students.
+  private async loadPublic(courseSlug: string, moduleId: string, isAdmin: boolean, userId?: string): Promise<CourseModule> {
     const module = await this.repo
       .createQueryBuilder('module')
       .innerJoin('module.course', 'course')
@@ -117,7 +120,8 @@ export class ModulesService {
       .getOne();
     if (!module) throw new NotFoundException('Module not found');
 
-    if (!module.isPreview && !isAdmin) {
+    const allowed = module.isPreview || isAdmin || (!!userId && (await this.enrolments.isEnrolled(userId, module.courseId)));
+    if (!allowed) {
       throw new ForbiddenException({
         message: 'This module is only available to enrolled students',
         error: 'Forbidden',

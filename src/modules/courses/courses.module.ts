@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EnrolmentsModule } from '../enrolments/enrolments.module';
 import { CategoriesAdminController } from './categories.admin.controller';
 import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
@@ -17,7 +18,7 @@ import { ModulesService } from './modules.service';
 
 // StorageService comes from the global StorageModule.
 @Module({
-  imports: [TypeOrmModule.forFeature([CourseCategory, Course, CourseModule, ModuleMaterial, QuizQuestion])],
+  imports: [TypeOrmModule.forFeature([CourseCategory, Course, CourseModule, ModuleMaterial, QuizQuestion]), EnrolmentsModule],
   controllers: [
     CategoriesController,
     CategoriesAdminController,

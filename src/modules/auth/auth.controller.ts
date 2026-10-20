@@ -102,7 +102,7 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
-  @ApiOperation({ summary: 'Sign in with email and password' })
+  @ApiOperation({ summary: 'Sign in with email (or username) and password' })
   @ApiOkResponse({ description: 'Access token in the body, refresh token in an httpOnly cookie.' })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials.' })
   @ApiForbiddenResponse({ description: 'Email not yet confirmed.' })

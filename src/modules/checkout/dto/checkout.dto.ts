@@ -4,7 +4,7 @@ import { IsEmail, MaxLength } from 'class-validator';
 import { TrimmedString } from '../../../common/decorators/trimmed-string.decorator';
 import { CalendarDay } from '../../candidates/dto/candidate.dto';
 
-// The public "purchase a course" form: the candidate form minus what only the council knows (certificate number, issue date).
+// The candidate form minus certificate number and issue date.
 export class CheckoutDto {
   @ApiProperty({ example: 'advanced-120-hour-tefl-course', description: 'The course to purchase.' })
   @TrimmedString(160)

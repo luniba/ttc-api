@@ -124,9 +124,9 @@ export class AuthService {
     await this.sendVerificationEmail(user);
   }
 
-  // Still runs a bcrypt compare against a throwaway hash when no account exists, so timing can't reveal whether the email is registered.
-  async validateUser(email: string, password: string): Promise<User | null> {
-    const user = await this.users.findByEmailWithSecrets(email);
+  // `login` is an email or a username; the dummy compare keeps timing even.
+  async validateUser(login: string, password: string): Promise<User | null> {
+    const user = await this.users.findByLoginWithSecrets(login);
 
     if (!user?.passwordHash) {
       await bcrypt.compare(password, DUMMY_HASH);
@@ -232,6 +232,7 @@ export class AuthService {
     }
 
     user.passwordHash = await this.users.hashPassword(newPassword);
+    user.tempPasswordEnc = null;
     user.passwordResetTokenHash = null;
     user.passwordResetExpiresAt = null;
     // Completing a reset proves mailbox control, the same evidence accepted for verification.
@@ -268,6 +269,8 @@ export class AuthService {
     }
 
     user.passwordHash = await this.users.hashPassword(newPassword);
+    // The student's own password ends the admin's view of it.
+    user.tempPasswordEnc = null;
     await this.users.save(user);
 
     // Same reasoning as resetPassword: the usual reason to change a password is suspecting someone else has a session.

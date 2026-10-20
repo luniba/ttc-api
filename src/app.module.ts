@@ -14,6 +14,7 @@ import configuration, {
 import { validateEnv } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { MailModule } from './mail/mail.module';
+import { AccountModule } from './modules/account/account.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CandidatesModule } from './modules/candidates/candidates.module';
 import { ContactModule } from './modules/contact/contact.module';
@@ -59,6 +60,7 @@ import { StorageModule } from './storage/storage.module';
     MailModule,
 
     AuthModule,
+    AccountModule,
     UsersModule,
     UploadsModule,
     CoursesModule,

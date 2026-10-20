@@ -23,14 +23,14 @@ export class ContactService {
     this.phone = contact.phone;
   }
 
-  // Fails loudly (503) rather than pretending: a visitor who sees "sent" for a message nobody received is worse than an error.
+  // 503 when it can't be sent, rather than pretending it was.
   async send(dto: ContactDto): Promise<void> {
     if (!this.to) {
       this.logger.error('Contact form is not configured: set CONTACT_TO_EMAIL or ADMIN_EMAIL.');
       throw new ServiceUnavailableException('Messages can’t be sent right now. Please email us directly.');
     }
 
-    // The slug is only a label for the email; an unknown or deleted course is shown as typed rather than rejected.
+    // An unknown slug is shown as typed.
     const course = dto.courseSlug
       ? await this.courses.findOne({ where: { slug: dto.courseSlug }, select: { title: true } })
       : null;
@@ -45,7 +45,7 @@ export class ContactService {
     });
     if (!sent) throw new ServiceUnavailableException('We couldn’t send your message. Please try again in a moment.');
 
-    // A receipt for the sender, after the team's copy is safely out; its failure never fails the request.
+    // Receipt for the sender; never fails the request.
     this.mail
       .sendContactConfirmation(dto.email, dto.firstName, this.phone, this.to)
       .catch((error: unknown) =>

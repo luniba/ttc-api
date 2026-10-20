@@ -63,9 +63,9 @@ export interface MaterialDto {
   fileName: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
-  /** file: signed URL (~10 min) that opens in the browser (a PDF shows in the viewer); link: the stored URL. */
+  /** file: signed URL that opens in the browser; link: the stored URL. */
   url: string;
-  /** file: signed URL (~10 min) that downloads it; null for links. */
+  /** file: signed URL that downloads; null for links. */
   downloadUrl: string | null;
 }
 

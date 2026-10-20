@@ -17,7 +17,7 @@ import { S3StorageService } from '../storage/s3-storage.service';
 // matched by name, and a course whose slug already exists (soft-deleted included) is skipped. Run with: npm run seed:courses
 loadEnv();
 
-// Override with SEED_IMAGES_DIR when running in the container, where the client repo isn't next to the API.
+// Override in the container.
 const IMAGES_DIR = process.env.SEED_IMAGES_DIR ?? resolve(__dirname, '../../../ttc-client/public/images');
 
 const TESOL_TEFL = 'TESOL & TEFL';

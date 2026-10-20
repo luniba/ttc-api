@@ -34,13 +34,13 @@ export class CoursesController {
     return this.courses.findOnePublic(slug);
   }
 
-  // Optional auth so enrolled students (later) and admins can be let through; guests only ever see preview modules.
+  // Optional auth: admins and enrolled students pass; guests see previews only.
   @Get(':slug/modules/:moduleId')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Read a module of a published course',
-    description: 'Preview modules are readable by anyone, materials included (file URLs are signed, ~10 min).',
+    description: 'Preview modules are readable by anyone, materials included (file URLs are signed, ~10 min). Other modules need an admin or a student enrolled in the course.',
   })
   @ApiForbiddenResponse({ description: 'MODULE_LOCKED — not a preview module.' })
   @ApiNotFoundResponse({ description: 'Unknown/unpublished course, or the module is not in it.' })
@@ -49,7 +49,7 @@ export class CoursesController {
     @Param('moduleId', ParseUUIDPipe) moduleId: string,
     @CurrentUser() user?: User,
   ): Promise<ModuleDto> {
-    return this.modules.findOnePublic(slug, moduleId, user?.role === UserRole.ADMIN);
+    return this.modules.findOnePublic(slug, moduleId, user?.role === UserRole.ADMIN, user?.id);
   }
 
   @Post(':slug/modules/:moduleId/quiz/check')
@@ -68,6 +68,6 @@ export class CoursesController {
     @Body() dto: CheckQuizDto,
     @CurrentUser() user?: User,
   ): Promise<QuizResult> {
-    return this.modules.checkQuiz(slug, moduleId, dto, user?.role === UserRole.ADMIN);
+    return this.modules.checkQuiz(slug, moduleId, dto, user?.role === UserRole.ADMIN, user?.id);
   }
 }

@@ -1,9 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'jane@example.com' })
-  @IsEmail()
+  // Named `email` for compatibility; also accepts a username.
+  @ApiProperty({ example: 'jane@example.com', description: 'Email address, or the username the account chose.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   email!: string;
 
   // Deliberately no IsStrongPassword: that policy applies when setting a password, not logging in with a legacy one.

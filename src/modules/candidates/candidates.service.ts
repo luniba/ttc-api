@@ -28,7 +28,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 // Only what the printed certificate already shows; never the passport number, email or address.
 export interface VerifiedCertificateDto {
-  certificateId: string;
+  certificateNo: string;
   holderName: string;
   courseTitle: string;
   issuedAt: string;
@@ -130,7 +130,7 @@ export class CandidatesService {
   async verify(id: string): Promise<CandidateDto> {
     const candidate = await this.repo.findOne({ where: { id } });
     if (!candidate) throw new NotFoundException('Candidate not found');
-    // A website purchase request has no certificate yet; verifying it would publish a certificate that doesn't exist.
+    // No certificate yet, so nothing to verify.
     if (!candidate.certificateNo || !candidate.issueDate) {
       throw new BadRequestException('Add the certificate number and issue date before verifying this candidate.');
     }
@@ -140,13 +140,13 @@ export class CandidatesService {
     return this.findOne(id);
   }
 
-  // Public check: all three details must match a verified candidate. One generic 404 otherwise,
-  // so a caller can't learn which detail was wrong or that an unverified record exists.
+  // Public check. One generic 404, so nothing leaks about which detail was wrong.
   async verifyCertificate(dto: VerifyCertificateDto): Promise<VerifiedCertificateDto> {
     const candidate = await this.query()
       .andWhere('candidate.isVerified = true')
-      .andWhere('LOWER(candidate.certificateId) = :certificateId', {
-        certificateId: dto.certificateId.toLowerCase(),
+      // Case and spacing ignored.
+      .andWhere(`LOWER(REGEXP_REPLACE(candidate.certificateNo, '\\s+', '', 'g')) = :certificateNo`, {
+        certificateNo: dto.certificateNo.replace(/\s+/g, '').toLowerCase(),
       })
       .andWhere(`LOWER(REGEXP_REPLACE(candidate.passportNo, '\\s+', '', 'g')) = :passportNo`, {
         passportNo: dto.passportNumber.replace(/\s+/g, '').toLowerCase(),
@@ -157,10 +157,11 @@ export class CandidatesService {
       .getOne();
     if (!candidate) throw new NotFoundException('No matching certificate');
     return {
-      certificateId: candidate.certificateId,
+      // Never empty once verified.
+      certificateNo: candidate.certificateNo ?? '',
       holderName: candidate.passportName,
       courseTitle: candidate.course.title,
-      // Verified candidates always have one (see verify()).
+      // Never empty once verified.
       issuedAt: candidate.issueDate ?? '',
     };
   }

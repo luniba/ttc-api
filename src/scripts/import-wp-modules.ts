@@ -12,10 +12,7 @@ import { MaterialType, ModuleMaterial } from '../modules/courses/entities/module
 import { QuizQuestion } from '../modules/courses/entities/quiz-question.entity';
 import { S3StorageService } from '../storage/s3-storage.service';
 
-// Copies the lesson PDFs of the two 120-hour courses from the old WordPress site into the new modules as file materials (private
-// bucket, same as an admin upload). Input: data/wp-module-content.json, a module title -> links map taken from the WP dump.
-// Idempotent: a module that already has materials is skipped. Run seed:courses first. Dry run: DRY_RUN=true.
-// Run with: npm run import:wp-modules
+// Copies the 120-hour lesson PDFs from the old site as private file materials. Idempotent. Dry run: DRY_RUN=true.
 loadEnv();
 
 interface WpModule {
@@ -42,7 +39,7 @@ async function download(url: string): Promise<Buffer> {
 
 async function importModules(): Promise<void> {
   const dryRun = process.env.DRY_RUN === 'true';
-  const wanted: WpModule[] = JSON.parse(await readFile(resolve(__dirname, '../../data/wp-module-content.json'), 'utf8'));
+  const wanted = JSON.parse(await readFile(resolve(__dirname, '../../data/wp-module-content.json'), 'utf8')) as WpModule[];
 
   const config = configuration();
   const storage = new S3StorageService({ getOrThrow: () => config.storage } as unknown as ConfigService);
@@ -110,7 +107,7 @@ async function importModules(): Promise<void> {
             },
           });
         }
-        // A module's materials go in together, so a failed download never leaves it half-filled.
+        // All of a module's files or none.
         if (uploaded.length) await materials.insert(uploaded.map((u) => u.row));
         added += wp.materials.length;
       } catch (error) {

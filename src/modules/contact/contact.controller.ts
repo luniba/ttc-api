@@ -13,7 +13,7 @@ export class ContactController {
   @Post()
   @Public()
   @HttpCode(HttpStatus.OK)
-  // Anonymous and it sends email, so it's the easiest route to abuse: a tight per-IP cap.
+  // Public: tight per-IP cap.
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @ApiOperation({ summary: 'Send a message from the public contact form', description: 'Emails the message to the site admin; the visitor is set as Reply-To.' })
   async send(@Body() dto: ContactDto): Promise<{ message: string }> {

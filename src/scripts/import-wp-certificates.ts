@@ -4,15 +4,14 @@ import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import configuration from '../config/configuration';
 import { Candidate } from '../modules/candidates/entities/candidate.entity';
+import { User } from '../modules/users/entities/user.entity';
 import { CourseCategory } from '../modules/courses/entities/course-category.entity';
 import { CourseModule } from '../modules/courses/entities/course-module.entity';
 import { Course } from '../modules/courses/entities/course.entity';
 import { ModuleMaterial } from '../modules/courses/entities/module-material.entity';
 import { QuizQuestion } from '../modules/courses/entities/quiz-question.entity';
 
-// Imports the certificate register from the old WordPress site (wp_certificatetable) as candidates. Prepared by exporting that table
-// to data/wp-certificates.json. Idempotent: a certificate number that already exists (soft-deleted included) is skipped.
-// Needs the TEFL/TESOL courses from seed-courses first. Dry run: DRY_RUN=true. Run with: npm run import:wp-certificates
+// Imports the old site's certificate register as candidates (data/wp-certificates.json). Idempotent. Dry run: DRY_RUN=true.
 loadEnv();
 
 interface WpCertificate {
@@ -27,7 +26,7 @@ interface WpCertificate {
   nationality: string;
 }
 
-// Old "course" column -> slug of the seeded 120-hour course.
+// Old course name -> seeded course slug.
 const COURSE_SLUGS: Record<string, string> = {
   TEFL: 'advanced-120-hour-tefl-course',
   TESOL: 'advanced-120-hour-tesol-course',
@@ -35,16 +34,16 @@ const COURSE_SLUGS: Record<string, string> = {
 
 async function importCertificates(): Promise<void> {
   const dryRun = process.env.DRY_RUN === 'true';
-  const rows: WpCertificate[] = JSON.parse(
+  const rows = JSON.parse(
     await readFile(resolve(__dirname, '../../data/wp-certificates.json'), 'utf8'),
-  );
+  ) as WpCertificate[];
 
   const config = configuration();
   const dataSource = new DataSource({
     type: 'postgres',
     url: config.database.url,
     ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-    entities: [Candidate, Course, CourseCategory, CourseModule, ModuleMaterial, QuizQuestion],
+    entities: [Candidate, Course, CourseCategory, CourseModule, ModuleMaterial, QuizQuestion, User],
     synchronize: false,
   });
   await dataSource.initialize();
@@ -75,8 +74,7 @@ async function importCertificates(): Promise<void> {
         continue;
       }
 
-      // Legacy certificates keep the number printed on them as their public certificate ID, so existing holders verify with what
-      // they already have. Both columns are unique, and the old numbers are, so there is no clash to retry.
+      // The printed certificate number doubles as the public ID.
       await repo.insert({
         certificateId: certificateNo,
         certificateNo,
@@ -89,7 +87,7 @@ async function importCertificates(): Promise<void> {
         courseId,
         issueDate: row.issue_date,
         nationality: row.nationality.trim(),
-        // Already issued and in circulation, so the public check should accept them.
+        // Already issued, so the public check accepts them.
         isVerified: true,
         verifiedAt: new Date(`${row.issue_date}T00:00:00Z`),
       });

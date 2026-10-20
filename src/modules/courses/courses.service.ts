@@ -88,8 +88,7 @@ export class CoursesService {
 
   // Not paginated: the public catalogue is a handful of courses rendered on one page.
   async findAllPublic(): Promise<CourseDto[]> {
-    // Categories in the order they were created (TESOL & TEFL before the sports certifications), newest course first inside each.
-    // The public page groups by category in the order it first sees one, so this order is what puts a category on top.
+    // TESOL & TEFL first, then sports (category creation order); newest course first within each.
     const courses = await this.query()
       .where('course.isPublished = true')
       .orderBy('category.createdAt', 'ASC')

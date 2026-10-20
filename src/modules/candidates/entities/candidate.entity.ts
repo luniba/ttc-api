@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Course } from '../../courses/entities/course.entity';
+import { User } from '../../users/entities/user.entity';
 
 // A certificate holder, recorded by an admin. Not a login account.
 @Entity('candidates')
@@ -25,8 +26,7 @@ export class Candidate {
   certificateId!: string;
 
   // Typed by the admin from the printed certificate.
-  // Null while the candidate is only a purchase request from the website; the admin fills it in when the certificate is issued.
-  // Unique still holds (Postgres allows many NULLs).
+  // Null for website requests until a certificate is issued.
   @Index('uq_candidates_certificate_no', { unique: true })
   @Column({ name: 'certificate_no', type: 'varchar', length: 60, nullable: true })
   certificateNo!: string | null;
@@ -64,6 +64,16 @@ export class Candidate {
   nationality!: string;
 
   // Set from the Verification page (POST /admin/candidates/:id/verify), never by the form.
+  // Student login created from a website request.
+  @Index('idx_candidates_user_id')
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId!: string | null;
+
+  // Keep the candidate if its user is removed.
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'user_id', foreignKeyConstraintName: 'fk_candidates_user' })
+  user!: User | null;
+
   @Index('idx_candidates_is_verified')
   @Column({ name: 'is_verified', type: 'boolean', default: false })
   isVerified!: boolean;

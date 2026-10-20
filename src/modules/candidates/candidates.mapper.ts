@@ -4,7 +4,7 @@ import type { Candidate } from './entities/candidate.entity';
 export interface CandidateDto {
   id: string;
   certificateId: string;
-  // Null for a purchase request that hasn't been issued a certificate yet.
+  // Null until a certificate is issued.
   certificateNo: string | null;
   passportName: string;
   passportNo: string;

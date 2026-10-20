@@ -29,6 +29,9 @@ export const ErrorCode = {
   // Module exists but the caller may not read it (not a preview module).
   MODULE_LOCKED: 'MODULE_LOCKED',
 
+  // Username already in use.
+  USERNAME_TAKEN: 'USERNAME_TAKEN',
+
   // Candidates — see modules/candidates. Includes soft-deleted candidates, which still hold the unique index.
   CERTIFICATE_NO_TAKEN: 'CERTIFICATE_NO_TAKEN',
 } as const;

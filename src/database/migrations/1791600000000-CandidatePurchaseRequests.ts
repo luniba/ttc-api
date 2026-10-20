@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-// Candidates can now start as a purchase request from the website, before any certificate exists.
+// Website requests start without a certificate.
 export class CandidatePurchaseRequests1791600000000 implements MigrationInterface {
     name = 'CandidatePurchaseRequests1791600000000'
 

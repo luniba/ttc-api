@@ -7,10 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { ErrorCode } from '../../common/constants/error-codes';
 import { Paginated } from '../../common/types/api-response';
 import { escapeLike } from '../../common/utils/escape-like';
+import { generatePassword } from '../../common/utils/generate-password';
+import { SecretBox } from '../../common/utils/secret-box';
 import type { AuthConfig } from '../../config/configuration';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import type { StudentQueryDto } from './dto/student.dto';
@@ -50,6 +52,7 @@ const AUTH_COLUMNS = [
 @Injectable()
 export class UsersService {
   private readonly cfg: AuthConfig;
+  private readonly secretBox: SecretBox;
 
   constructor(
     @InjectRepository(User) private readonly repo: Repository<User>,
@@ -59,6 +62,7 @@ export class UsersService {
     config: ConfigService,
   ) {
     this.cfg = config.getOrThrow<AuthConfig>('auth');
+    this.secretBox = new SecretBox(this.cfg.credentialsKey, this.cfg.accessSecret);
   }
 
   /** Case and whitespace differences must not create duplicate accounts. */
@@ -91,6 +95,40 @@ export class UsersService {
       .getOne();
   }
 
+  /** An email (has an @) or a username. */
+  findByLoginWithSecrets(identifier: string): Promise<User | null> {
+    const value = identifier.trim();
+    if (value.includes('@')) return this.findByEmailWithSecrets(value);
+    return this.repo
+      .createQueryBuilder('user')
+      .addSelect([...AUTH_COLUMNS])
+      .where('lower(user.username) = :username', { username: value.toLowerCase() })
+      .getOne();
+  }
+
+  async setUsername(userId: string, username: string): Promise<User> {
+    const user = await this.repo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Account not found');
+    const taken = () =>
+      new ConflictException({ message: 'That username is already taken', error: 'Conflict', code: ErrorCode.USERNAME_TAKEN });
+
+    // Friendly message first; the unique index settles races.
+    const other = await this.repo
+      .createQueryBuilder('user')
+      .where('lower(user.username) = :username AND user.id != :id', { username: username.toLowerCase(), id: userId })
+      .withDeleted()
+      .getExists();
+    if (other) throw taken();
+
+    user.username = username;
+    try {
+      return await this.repo.save(user);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error.driverError as { code?: string }).code === '23505') throw taken();
+      throw error;
+    }
+  }
+
   findByTokenHash(
     column: 'passwordResetTokenHash' | 'emailVerifyTokenHash',
     hash: string,
@@ -113,6 +151,44 @@ export class UsersService {
       emailVerified: input.emailVerified ?? false,
     });
     return this.repo.save(user);
+  }
+
+  /** A new student with a generated password, returned once so it can be emailed. */
+  async createStudentWithTempPassword(email: string, name: string): Promise<{ user: User; password: string }> {
+    const password = generatePassword();
+    const user = await this.repo.save(
+      this.repo.create({
+        email: UsersService.normalizeEmail(email),
+        name: name.trim().slice(0, 120),
+        role: UserRole.STUDENT,
+        passwordHash: await this.hashPassword(password),
+        emailVerified: true,
+        tempPasswordEnc: this.secretBox.encrypt(password),
+      }),
+    );
+    return { user, password };
+  }
+
+  /** The starting password, or null once the student changes it. */
+  async revealTempPassword(userId: string): Promise<string | null> {
+    const user = await this.repo
+      .createQueryBuilder('user')
+      .addSelect('user.tempPasswordEnc')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+    return user?.tempPasswordEnc ? this.secretBox.decrypt(user.tempPasswordEnc) : null;
+  }
+
+  // Students only. Drops their sessions.
+  async setStudentPassword(userId: string, password: string): Promise<void> {
+    const user = await this.repo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Account not found');
+    if (user.role !== UserRole.STUDENT) throw new ForbiddenException('Only student accounts can be changed here');
+
+    user.passwordHash = await this.hashPassword(password);
+    user.tempPasswordEnc = this.secretBox.encrypt(password);
+    await this.repo.save(user);
+    await this.refreshTokens.delete({ userId: user.id });
   }
 
   save(user: User): Promise<User> {
