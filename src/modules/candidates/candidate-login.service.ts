@@ -5,7 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { generatePassword } from '../../common/utils/generate-password';
 import type { AppConfig, ContactConfig } from '../../config/configuration';
 import { MailService } from '../../mail/mail.service';
+import { Course } from '../courses/entities/course.entity';
 import { EnrolmentsService } from '../enrolments/enrolments.service';
+import { OrderItem } from '../orders/entities/order-item.entity';
 import { UserRole } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { Candidate } from './entities/candidate.entity';
@@ -16,8 +18,19 @@ export interface CandidateLoginDto {
   username: string | null;
   password: string | null;
   passwordChangedByStudent: boolean;
-  // An admin has granted access.
-  enrolled: boolean;
+}
+
+// One course on the candidate's Courses tab: granted means their login can open it.
+export interface CandidateCourseDto {
+  id: string;
+  title: string;
+  granted: boolean;
+  grantedAt: Date | null;
+}
+
+export interface CandidateCoursesDto {
+  hasAccount: boolean;
+  courses: CandidateCourseDto[];
 }
 
 @Injectable()
@@ -30,6 +43,8 @@ export class CandidateLoginService {
   constructor(
     config: ConfigService,
     @InjectRepository(Candidate) private readonly candidates: Repository<Candidate>,
+    @InjectRepository(Course) private readonly courses: Repository<Course>,
+    @InjectRepository(OrderItem) private readonly orderItems: Repository<OrderItem>,
     private readonly users: UsersService,
     private readonly enrolments: EnrolmentsService,
     private readonly mail: MailService,
@@ -43,7 +58,7 @@ export class CandidateLoginService {
     if (!candidate) throw new NotFoundException('Candidate not found');
 
     const user = candidate.userId ? await this.users.findById(candidate.userId) : null;
-    if (!user) return { hasAccount: false, username: null, password: null, passwordChangedByStudent: false, enrolled: false };
+    if (!user) return { hasAccount: false, username: null, password: null, passwordChangedByStudent: false };
 
     const password = await this.users.revealTempPassword(user.id);
     return {
@@ -52,38 +67,78 @@ export class CandidateLoginService {
       username: user.username ?? user.email,
       password,
       passwordChangedByStudent: password === null,
-      enrolled: await this.enrolments.isEnrolled(user.id, candidate.courseId),
     };
   }
 
-  // Grants access and emails the student; repeats do nothing.
-  async grantAccess(candidateId: string, actorId: string): Promise<CandidateLoginDto> {
+  // The course they asked for, the courses on their orders, and anything their login can already open.
+  async listCourses(candidateId: string): Promise<CandidateCoursesDto> {
     const candidate = await this.candidates.findOne({ where: { id: candidateId }, relations: { course: true } });
     if (!candidate) throw new NotFoundException('Candidate not found');
-    if (!candidate.userId) throw new BadRequestException('This candidate has no login yet.');
-    const user = await this.users.findById(candidate.userId);
-    if (!user) throw new BadRequestException('This candidate has no login yet.');
 
-    const { created } = await this.enrolments.grant(user.id, candidate.courseId, actorId);
-    if (created) {
-      this.logger.log(`Admin ${actorId} granted candidate ${candidateId} access to course ${candidate.courseId}`);
+    const [enrolled, ordered] = await Promise.all([
+      candidate.userId ? this.enrolments.findForUser(candidate.userId) : [],
+      this.orderItems
+        .createQueryBuilder('item')
+        .innerJoin('item.order', 'order')
+        .where('order.candidateId = :candidateId', { candidateId })
+        .andWhere('order.deletedAt IS NULL')
+        .orderBy('item.courseTitle', 'ASC')
+        .getMany(),
+    ]);
+
+    const grants = new Map(enrolled.map((e) => [e.courseId, e.grantedAt]));
+    const list = new Map<string, CandidateCourseDto>();
+    const add = (id: string, title: string) => {
+      if (!list.has(id)) list.set(id, { id, title, granted: grants.has(id), grantedAt: grants.get(id) ?? null });
+    };
+    add(candidate.course.id, candidate.course.title);
+    for (const e of enrolled) add(e.courseId, e.course.title);
+    for (const i of ordered) add(i.courseId, i.courseTitle);
+    return { hasAccount: !!candidate.userId, courses: [...list.values()] };
+  }
+
+  // Unlocks the course and emails the student; repeats do nothing.
+  async grantCourse(candidateId: string, courseId: string, actorId: string): Promise<CandidateCoursesDto> {
+    const candidate = await this.candidates.findOne({ where: { id: candidateId } });
+    if (!candidate) throw new NotFoundException('Candidate not found');
+    const course = await this.courses.findOne({ where: { id: courseId } });
+    if (!course) throw new NotFoundException('Course not found');
+    if (!(await this.grantCourses(candidate, [course], actorId))) {
+      throw new BadRequestException('This candidate has no login yet.');
+    }
+    return this.listCourses(candidateId);
+  }
+
+  // Grants the courses to the candidate's login, one email per new grant. False when there's no login yet.
+  async grantCourses(
+    candidate: Candidate,
+    courses: { id: string; title: string }[],
+    actorId: string,
+  ): Promise<boolean> {
+    const user = candidate.userId ? await this.users.findById(candidate.userId) : null;
+    if (!user) return false;
+
+    for (const course of courses) {
+      const { created } = await this.enrolments.grant(user.id, course.id, actorId);
+      if (!created) continue;
+      this.logger.log(`Admin ${actorId} granted candidate ${candidate.id} access to course ${course.id}`);
       this.mail
-        .sendAccessGranted(user.email, user.name, candidate.course.title, `${this.frontendUrl}/account`, this.teamEmail)
+        .sendAccessGranted(user.email, user.name, course.title, `${this.frontendUrl}/account`, this.teamEmail)
         .catch((error: unknown) =>
           this.logger.error(`Access email failed: ${error instanceof Error ? error.message : String(error)}`),
         );
     }
-    return this.get(candidateId);
+    return true;
   }
 
-  async revokeAccess(candidateId: string, actorId: string): Promise<CandidateLoginDto> {
+  async revokeCourse(candidateId: string, courseId: string, actorId: string): Promise<CandidateCoursesDto> {
     const candidate = await this.candidates.findOne({ where: { id: candidateId } });
     if (!candidate) throw new NotFoundException('Candidate not found');
     if (candidate.userId) {
-      await this.enrolments.revoke(candidate.userId, candidate.courseId);
-      this.logger.log(`Admin ${actorId} revoked candidate ${candidateId}'s access to course ${candidate.courseId}`);
+      await this.enrolments.revoke(candidate.userId, courseId);
+      this.logger.log(`Admin ${actorId} revoked candidate ${candidateId}'s access to course ${courseId}`);
     }
-    return this.get(candidateId);
+    return this.listCourses(candidateId);
   }
 
   // Creates a student login from the record's email, or links the existing account. Never changes a password; never links staff.

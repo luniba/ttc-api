@@ -1,13 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { Paginated } from '../../common/types/api-response';
 import { escapeLike } from '../../common/utils/escape-like';
+import { CandidateLoginService } from '../candidates/candidate-login.service';
 import { Candidate } from '../candidates/entities/candidate.entity';
 import { Course } from '../courses/entities/course.entity';
 import type { CreateOrderDto, OrderQueryDto, UpdateOrderDto } from './dto/order.dto';
 import { OrderItem } from './entities/order-item.entity';
-import { Order } from './entities/order.entity';
+import { Order, OrderStatus } from './entities/order.entity';
 import { toOrderDto, type OrderDto } from './orders.mapper';
 
 // Summed in cents so 0.1 + 0.2 never shows up on an invoice.
@@ -16,9 +17,12 @@ export const sumPrices = (prices: number[]): number =>
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order) private readonly repo: Repository<Order>,
     @InjectRepository(Candidate) private readonly candidates: Repository<Candidate>,
+    private readonly logins: CandidateLoginService,
   ) {}
 
   // withDeleted for the joins: a candidate deleted later still shows on their orders.
@@ -61,10 +65,10 @@ export class OrdersService {
     return toOrderDto(order);
   }
 
-  async create(dto: CreateOrderDto): Promise<OrderDto> {
+  async create(dto: CreateOrderDto, actorId: string): Promise<OrderDto> {
     await this.assertCandidateExists(dto.candidateId);
 
-    const id = await this.repo.manager.transaction(async (em) => {
+    const order = await this.repo.manager.transaction(async (em) => {
       const items = await this.newItems(em, dto.courseIds);
       const [{ n }] = await em.query<{ n: string }[]>(`SELECT nextval('orders_order_no_seq') AS n`);
       const order = em.create(Order, {
@@ -75,15 +79,18 @@ export class OrdersService {
         total: sumPrices(items.map((i) => i.price)),
         items,
       });
-      return (await em.save(order)).id;
+      return em.save(order);
     });
-    return this.findOne(id);
+    await this.grantIfCompleted(order, order.items, actorId);
+    return this.findOne(order.id);
   }
 
-  async update(id: string, dto: UpdateOrderDto): Promise<OrderDto> {
-    await this.repo.manager.transaction(async (em) => {
+  async update(id: string, dto: UpdateOrderDto, actorId: string): Promise<OrderDto> {
+    const { order, newItems } = await this.repo.manager.transaction(async (em) => {
       const order = await em.findOne(Order, { where: { id }, relations: { items: true } });
       if (!order) throw new NotFoundException('Order not found');
+      const wasCompletedFor = order.status === OrderStatus.COMPLETED ? order.candidateId : null;
+      let added: OrderItem[] = [];
 
       if (dto.candidateId !== undefined && dto.candidateId !== order.candidateId) {
         await this.assertCandidateExists(dto.candidateId);
@@ -96,7 +103,7 @@ export class OrdersService {
         // Courses already on the order keep the price they were added at; new ones take today's.
         const wanted = new Set(dto.courseIds);
         const kept = order.items.filter((i) => wanted.has(i.courseId));
-        const added = await this.newItems(
+        added = await this.newItems(
           em,
           dto.courseIds.filter((courseId) => !kept.some((i) => i.courseId === courseId)),
         );
@@ -106,9 +113,29 @@ export class OrdersService {
         order.total = sumPrices(order.items.map((i) => i.price));
       }
 
-      await em.save(order);
+      const saved = await em.save(order);
+      // Only what this save completes, so an unrelated edit never undoes an admin's revoke.
+      return { order: saved, newItems: wasCompletedFor === saved.candidateId ? added : saved.items };
     });
+    await this.grantIfCompleted(order, newItems, actorId);
     return this.findOne(id);
+  }
+
+  // A completed order gives the candidate's login its courses; it never takes access away.
+  // Best effort: the order is already saved, and an admin can still grant from the candidate page.
+  private async grantIfCompleted(order: Order, items: OrderItem[], actorId: string): Promise<void> {
+    if (order.status !== OrderStatus.COMPLETED || items.length === 0) return;
+    try {
+      const candidate = await this.candidates.findOneBy({ id: order.candidateId });
+      const courses = items.map((i) => ({ id: i.courseId, title: i.courseTitle }));
+      if (candidate && !(await this.logins.grantCourses(candidate, courses, actorId))) {
+        this.logger.warn(`Order ${order.orderNo} is completed but candidate ${order.candidateId} has no login; access not granted.`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Granting access for order ${order.orderNo} failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   // Soft delete: the order and its number can be restored.

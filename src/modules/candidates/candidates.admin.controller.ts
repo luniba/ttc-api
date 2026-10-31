@@ -23,7 +23,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { Paginated } from '../../common/types/api-response';
 import { User, UserRole } from '../users/entities/user.entity';
-import { CandidateLoginService, type CandidateLoginDto } from './candidate-login.service';
+import { CandidateLoginService, type CandidateCoursesDto, type CandidateLoginDto } from './candidate-login.service';
 import type { CandidateDto } from './candidates.mapper';
 import { CandidatesService } from './candidates.service';
 import { CandidateQueryDto, CreateCandidateDto, UpdateCandidateDto } from './dto/candidate.dto';
@@ -119,21 +119,38 @@ export class CandidatesAdminController {
     return this.logins.setPassword(id, admin.id, dto.password);
   }
 
-  @Post(':id/access')
-  @HttpCode(HttpStatus.OK)
+  @Get(':id/courses')
   @ApiOperation({
-    summary: "Grant the candidate's student login access to their course",
-    description: 'Unlocks every module for that student and emails them. Needs a login (created when they request a course on the website).',
+    summary: "A candidate's courses and access",
+    description: "The course they requested, the courses on their orders, and any course their login can already open, each with whether access is granted.",
   })
-  grantAccess(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() admin: User): Promise<CandidateLoginDto> {
-    return this.logins.grantAccess(id, admin.id);
+  courses(@Param('id', ParseUUIDPipe) id: string): Promise<CandidateCoursesDto> {
+    return this.logins.listCourses(id);
   }
 
-  @Delete(':id/access')
+  @Post(':id/courses/:courseId/access')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Take the candidate's course access away", description: 'The modules lock again for that student. Safe to repeat.' })
-  revokeAccess(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() admin: User): Promise<CandidateLoginDto> {
-    return this.logins.revokeAccess(id, admin.id);
+  @ApiOperation({
+    summary: "Grant the candidate's student login access to a course",
+    description: 'Unlocks every module of that course for the student and emails them. Needs a login (created when they request a course on the website).',
+  })
+  grantCourse(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @CurrentUser() admin: User,
+  ): Promise<CandidateCoursesDto> {
+    return this.logins.grantCourse(id, courseId, admin.id);
+  }
+
+  @Delete(':id/courses/:courseId/access')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Take the candidate's access to a course away", description: 'The modules lock again for that student. Safe to repeat.' })
+  revokeCourse(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @CurrentUser() admin: User,
+  ): Promise<CandidateCoursesDto> {
+    return this.logins.revokeCourse(id, courseId, admin.id);
   }
 
   @Delete(':id')
