@@ -173,6 +173,13 @@ export class CandidatesService {
     return { message: 'Candidate deleted' };
   }
 
+  // For a certificate generated without a candidate record. Live courses only, like assignment.
+  async courseTitle(courseId: string): Promise<string> {
+    const course = await this.courses.findOne({ where: { id: courseId }, select: { id: true, title: true } });
+    if (!course) throw new BadRequestException(`No course with id "${courseId}"`);
+    return course.title;
+  }
+
   // Only live courses can be assigned; existing holders keep a course deleted later.
   private async assertCourseExists(courseId: string): Promise<void> {
     if (!(await this.courses.existsBy({ id: courseId }))) {
