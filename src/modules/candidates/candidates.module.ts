@@ -8,13 +8,15 @@ import { UsersModule } from '../users/users.module';
 import { CandidateLoginService } from './candidate-login.service';
 import { CandidatesAdminController } from './candidates.admin.controller';
 import { CandidatesService } from './candidates.service';
+import { CertificateDocumentsService } from './certificate-documents/certificate-documents.service';
+import { CertificateGeneratorController } from './certificate-generator.controller';
 import { CertificatesController } from './certificates.controller';
 import { Candidate } from './entities/candidate.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Candidate, Course, OrderItem]), UsersModule, EnrolmentsModule, MailModule],
-  controllers: [CandidatesAdminController, CertificatesController],
-  providers: [CandidatesService, CandidateLoginService],
+  controllers: [CandidatesAdminController, CertificatesController, CertificateGeneratorController],
+  providers: [CandidatesService, CandidateLoginService, CertificateDocumentsService],
   exports: [CandidateLoginService],
 })
 export class CandidatesModule {}

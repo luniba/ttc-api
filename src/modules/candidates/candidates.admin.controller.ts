@@ -6,17 +6,21 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Put,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiOperation,
+  ApiParam,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -24,6 +28,15 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import type { Paginated } from '../../common/types/api-response';
 import { User, UserRole } from '../users/entities/user.entity';
 import { CandidateLoginService, type CandidateCoursesDto, type CandidateLoginDto } from './candidate-login.service';
+import { CertificateDocumentsService } from './certificate-documents/certificate-documents.service';
+import {
+  CERTIFICATE_DOCUMENTS,
+  CERTIFICATE_VARIANTS,
+  type CertificateDocument,
+  type CertificateVariant,
+  documentFilename,
+  enumOf,
+} from './certificate-documents/certificate-format';
 import type { CandidateDto } from './candidates.mapper';
 import { CandidatesService } from './candidates.service';
 import { CandidateQueryDto, CreateCandidateDto, UpdateCandidateDto } from './dto/candidate.dto';
@@ -39,6 +52,7 @@ export class CandidatesAdminController {
   constructor(
     private readonly candidates: CandidatesService,
     private readonly logins: CandidateLoginService,
+    private readonly documents: CertificateDocumentsService,
   ) {}
 
   @Get()
@@ -71,6 +85,41 @@ export class CandidatesAdminController {
   @ApiConflictResponse({ description: 'CERTIFICATE_NO_TAKEN' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCandidateDto): Promise<CandidateDto> {
     return this.candidates.update(id, dto);
+  }
+
+  @Get(':id/documents/:document/:variant')
+  @ApiOperation({
+    summary: "Generate the candidate's certificate or transcript as a PDF",
+    description:
+      'Built from the record each time, so an edit shows up in the next download. TEFL courses only for now. Needs certificateNo and issueDate → 400 otherwise.',
+  })
+  @ApiParam({ name: 'document', enum: CERTIFICATE_DOCUMENTS })
+  @ApiParam({
+    name: 'variant',
+    enum: CERTIFICATE_VARIANTS,
+    description: 'digital: cream background, for screens and email. print: white background, for paper.',
+  })
+  @ApiProduces('application/pdf')
+  async document(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('document', new ParseEnumPipe(enumOf(CERTIFICATE_DOCUMENTS))) document: CertificateDocument,
+    @Param('variant', new ParseEnumPipe(enumOf(CERTIFICATE_VARIANTS))) variant: CertificateVariant,
+  ): Promise<StreamableFile> {
+    const candidate = await this.candidates.findOne(id);
+    const pdf = await this.documents.render(document, variant, {
+      passportName: candidate.passportName,
+      certificateNo: candidate.certificateNo,
+      dateOfBirth: candidate.dateOfBirth,
+      issueDate: candidate.issueDate,
+      courseTitle: candidate.course.title,
+    });
+    // certificateNo is set: render() refuses without it.
+    const filename = documentFilename(candidate.certificateNo ?? '', document, variant);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+      length: pdf.length,
+    });
   }
 
   @Post(':id/verify')

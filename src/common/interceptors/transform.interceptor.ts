@@ -1,17 +1,20 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor, StreamableFile } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Paginated, type SuccessResponse } from '../types/api-response';
 
 // Wraps every successful response in the envelope so controllers can return plain values and stay unaware of it.
 @Injectable()
-export class TransformInterceptor<T> implements NestInterceptor<T, SuccessResponse<unknown>> {
+export class TransformInterceptor<T> implements NestInterceptor<T, SuccessResponse<unknown> | StreamableFile> {
   intercept(
     _context: ExecutionContext,
     next: CallHandler<T>,
-  ): Observable<SuccessResponse<unknown>> {
+  ): Observable<SuccessResponse<unknown> | StreamableFile> {
     return next.handle().pipe(
       map((payload) => {
+        // File downloads (PDFs) go out as-is: wrapping them would turn the bytes into JSON.
+        if (payload instanceof StreamableFile) return payload;
+
         const timestamp = new Date().toISOString();
 
         // Counts go in `meta` so `data` stays a plain array regardless of endpoint.
