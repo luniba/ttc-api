@@ -37,7 +37,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: appleboy/scp-action@v0.1.7
+      # The server throttles SSH under bot traffic (MaxStartups) and drops new connections for a
+      # minute or two, so each SSH step gets one retry after a pause.
+      - id: copy
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.CONTABO_HOST }}
           username: ${{ secrets.CONTABO_USER }}
@@ -46,17 +50,56 @@ jobs:
           source: "deploy/docker-compose.yml"
           target: "/var/www/ttc/ttc-api"
           strip_components: 1
-      - uses: appleboy/ssh-action@v1
+      - if: steps.copy.outcome == 'failure'
+        run: sleep 30
+      - if: steps.copy.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: ${{ secrets.CONTABO_PORT || 22 }}
+          source: "deploy/docker-compose.yml"
+          target: "/var/www/ttc/ttc-api"
+          strip_components: 1
+      - id: release
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.CONTABO_HOST }}
           username: ${{ secrets.CONTABO_USER }}
           key: ${{ secrets.CONTABO_SSH_KEY }}
           port: ${{ secrets.CONTABO_PORT || 22 }}
           script: |
+            # Stop at the first failing command, so a broken pull fails the deploy instead of
+            # leaving the old container running behind a green check.
+            set -eu
             cd /var/www/ttc/ttc-api
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull api
             docker compose up -d postgres redis minio
             docker compose run --rm api npm run migration:run
-            docker compose up -d api
+            # Always restart on the image just pulled; plain `up -d` has left the old one running.
+            docker compose up -d --no-deps --force-recreate api
+            docker image prune -f
+      - if: steps.release.outcome == 'failure'
+        run: sleep 30
+      - if: steps.release.outcome == 'failure'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: ${{ secrets.CONTABO_PORT || 22 }}
+          script: |
+            # Stop at the first failing command, so a broken pull fails the deploy instead of
+            # leaving the old container running behind a green check.
+            set -eu
+            cd /var/www/ttc/ttc-api
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull api
+            docker compose up -d postgres redis minio
+            docker compose run --rm api npm run migration:run
+            # Always restart on the image just pulled; plain `up -d` has left the old one running.
+            docker compose up -d --no-deps --force-recreate api
             docker image prune -f
