@@ -86,7 +86,7 @@ describe('POST /admin/certificates/:document/:variant', () => {
     ).toBe(400);
   });
 
-  it('refuses a non-TEFL course', async () => {
+  it('refuses a course that is neither TEFL nor TESOL', async () => {
     const other = '9a1d1f2e-0000-4000-8000-000000000000';
     expect(
       (await post('certificate/print', { ...body, courseId: other })).status,

@@ -12,12 +12,24 @@ export const CERTIFICATE_VARIANTS: readonly CertificateVariant[] = [
   'print',
 ];
 
-// "Advanced 120-Hour TEFL Course" → "120-Hour TEFL". Null when the title isn't a TEFL course: the
-// templates' transcript lists the TEFL modules, so other courses have no design yet.
-export function teflCourseLabel(courseTitle: string): string | null {
-  const match = /(\d+)\s*-?\s*hours?\s+TEFL\b/i.exec(courseTitle);
-  if (match) return `${match[1]}-Hour TEFL`;
-  return /\bTEFL\b/i.test(courseTitle) ? 'TEFL' : null;
+export type Programme = 'TEFL' | 'TESOL';
+
+// "Advanced 120-Hour TESOL Course" → { programme: 'TESOL', label: '120-Hour TESOL' }. Null for a
+// course that is neither (no design for it). The first of TEFL / TESOL in the title wins.
+export function courseLabel(
+  courseTitle: string,
+): { programme: Programme; label: string } | null {
+  const found = /\b(TEFL|TESOL)\b/i.exec(courseTitle);
+  if (!found) return null;
+  const programme = found[1].toUpperCase() as Programme;
+  const hours = new RegExp(
+    `(\\d+)\\s*-?\\s*hours?\\s+${programme}\\b`,
+    'i',
+  ).exec(courseTitle);
+  return {
+    programme,
+    label: hours ? `${hours[1]}-Hour ${programme}` : programme,
+  };
 }
 
 // "1998-10-25" → "25/10/1998" (date of birth, as on the transcript).

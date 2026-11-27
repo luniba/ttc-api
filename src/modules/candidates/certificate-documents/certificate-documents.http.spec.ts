@@ -72,10 +72,21 @@ describe('GET /admin/candidates/:id/documents/:document/:variant', () => {
     expect((await fetch(`${base}/certificate/a3`)).status).toBe(400);
   });
 
-  it('refuses a non-TEFL course', async () => {
-    candidate.course.title = 'Advanced 120-Hour TESOL Course';
+  it('refuses a course that is neither TEFL nor TESOL', async () => {
+    candidate.course.title = 'A-Level Advanced Football Course';
     try {
       expect((await fetch(`${base}/certificate/print`)).status).toBe(400);
+    } finally {
+      candidate.course.title = 'Advanced 120-Hour TEFL Course';
+    }
+  });
+
+  it('generates a TESOL transcript', async () => {
+    candidate.course.title = 'Advanced 120-Hour TESOL Course';
+    try {
+      const res = await fetch(`${base}/transcript/digital`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('application/pdf');
     } finally {
       candidate.course.title = 'Advanced 120-Hour TEFL Course';
     }

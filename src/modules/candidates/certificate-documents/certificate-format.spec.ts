@@ -3,24 +3,26 @@ import {
   formatDateOfBirth,
   formatIssueDate,
   printedName,
-  teflCourseLabel,
+  courseLabel,
 } from './certificate-format';
 
 describe('certificate-format', () => {
-  it('derives the TEFL label from the course title', () => {
-    expect(teflCourseLabel('Advanced 120-Hour TEFL Course')).toBe(
-      '120-Hour TEFL',
-    );
-    expect(teflCourseLabel('Advanced 180-Hour TEFL Course')).toBe(
-      '180-Hour TEFL',
-    );
-    expect(teflCourseLabel('120 hour tefl')).toBe('120-Hour TEFL');
-    expect(teflCourseLabel('TEFL Foundations')).toBe('TEFL');
+  it('derives the programme and label from the course title', () => {
+    expect(courseLabel('Advanced 120-Hour TEFL Course')).toEqual({
+      programme: 'TEFL',
+      label: '120-Hour TEFL',
+    });
+    expect(courseLabel('Advanced 180-Hour TESOL Course')).toEqual({
+      programme: 'TESOL',
+      label: '180-Hour TESOL',
+    });
+    expect(courseLabel('120 hour tesol')?.label).toBe('120-Hour TESOL');
+    expect(courseLabel('TEFL Foundations')?.label).toBe('TEFL');
   });
 
-  it('refuses non-TEFL courses', () => {
-    expect(teflCourseLabel('Advanced 120-Hour TESOL Course')).toBeNull();
-    expect(teflCourseLabel('A-Level Advanced Football Course')).toBeNull();
+  it('refuses courses that are neither TEFL nor TESOL', () => {
+    expect(courseLabel('A-Level Advanced Football Course')).toBeNull();
+    expect(courseLabel('Teflon basics')).toBeNull();
   });
 
   it('formats dates as the designs print them', () => {
