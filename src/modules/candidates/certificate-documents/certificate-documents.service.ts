@@ -149,13 +149,14 @@ const TRANSCRIPT_LAYOUT: Record<
   'name' | 'dob' | 'course' | 'number' | 'issued' | 'programme',
   TextSlot
 > = {
-  // Closes "Certificate in Teaching English to Speakers of Other Languages (" in the heading,
-  // which the template prints up to the bracket: "TEFL)" or "TESOL)".
+  // Ends the heading "Certificate in Teaching English to Speakers of Other Languages", which the
+  // template prints without the bracket: "(TEFL)" or "(TESOL)". x puts the bracket's ink where
+  // the original bracket began.
   programme: {
     font: 'latoBold',
     size: 36.7,
     color: INK,
-    x: 1269.9,
+    x: 1265.8,
     y: 852,
     align: 'left',
     maxWidth: 200,
@@ -267,7 +268,7 @@ export class CertificateDocumentsService {
       const layout = TRANSCRIPT_LAYOUT;
       await draw(layout.name, name);
       await draw(layout.dob, formatDateOfBirth(data.dateOfBirth));
-      await draw(layout.programme, `${course.programme})`);
+      await draw(layout.programme, `(${course.programme})`);
       await draw(layout.course, course.label);
       await draw(layout.number, data.certificateNo);
       await draw(layout.issued, issued);
