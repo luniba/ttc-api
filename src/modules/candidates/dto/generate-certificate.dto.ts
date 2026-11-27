@@ -15,7 +15,7 @@ export class GenerateCertificateDto {
 
   @ApiProperty({
     format: 'uuid',
-    description: 'A TEFL course; its title gives the "120-Hour TEFL" wording.',
+    description: 'A TEFL or TESOL course; its title gives the "120-Hour TESOL" wording.',
   })
   @IsUUID()
   courseId!: string;

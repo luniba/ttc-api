@@ -16,8 +16,10 @@ No blank originals exist, so these were made from filled-in examples with PyMuPD
   date (certificates), and a hidden stale number (`TTC‐1132‐0657`) left under the visible one.
 - Digital certificate: painted the off-colour cover patches the editor left behind with the page
   colour `rgb(1, 0.941, 0.847)`, keeping the name underline.
-- Transcripts: removed the form fields and the values printed beneath them. The 12 TEFL modules and
-  their "A" results are part of the template.
+- Transcripts: removed the form fields and the values printed beneath them, and the "TEFL)" that
+  closed the heading "Certificate in Teaching English to Speakers of Other Languages (": the
+  service draws "TEFL)" or "TESOL)" there. The 12 modules and their "A" results are part of the
+  template and are the same for both programmes.
 
 Text positions are in `CERTIFICATE_LAYOUT` / `TRANSCRIPT_LAYOUT` in the service. If a designer
 supplies new blanks, keep the page sizes or re-measure those positions.

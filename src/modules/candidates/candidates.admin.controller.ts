@@ -91,7 +91,7 @@ export class CandidatesAdminController {
   @ApiOperation({
     summary: "Generate the candidate's certificate or transcript as a PDF",
     description:
-      'Built from the record each time, so an edit shows up in the next download. TEFL courses only for now. Needs certificateNo and issueDate → 400 otherwise.',
+      'Built from the record each time, so an edit shows up in the next download. TEFL and TESOL courses. Needs certificateNo and issueDate → 400 otherwise.',
   })
   @ApiParam({ name: 'document', enum: CERTIFICATE_DOCUMENTS })
   @ApiParam({

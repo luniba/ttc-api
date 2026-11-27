@@ -47,7 +47,7 @@ export class CertificateGeneratorController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate a certificate or transcript from the given details',
-    description: 'Nothing is saved. TEFL courses only for now → 400 otherwise.',
+    description: 'Nothing is saved. TEFL and TESOL courses only → 400 otherwise.',
   })
   @ApiParam({ name: 'document', enum: CERTIFICATE_DOCUMENTS })
   @ApiParam({ name: 'variant', enum: CERTIFICATE_VARIANTS })

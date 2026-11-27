@@ -16,7 +16,7 @@ import {
   formatDateOfBirth,
   formatIssueDate,
   printedName,
-  teflCourseLabel,
+  courseLabel,
 } from './certificate-format';
 
 // src/assets/certificates, copied to dist/assets/certificates by nest-cli.json. Same relative path from both.
@@ -146,9 +146,20 @@ const CERTIFICATE_LAYOUT: Record<
 
 // 1808 × 2560 pt portrait; both variants share positions.
 const TRANSCRIPT_LAYOUT: Record<
-  'name' | 'dob' | 'course' | 'number' | 'issued',
+  'name' | 'dob' | 'course' | 'number' | 'issued' | 'programme',
   TextSlot
 > = {
+  // Closes "Certificate in Teaching English to Speakers of Other Languages (" in the heading,
+  // which the template prints up to the bracket: "TEFL)" or "TESOL)".
+  programme: {
+    font: 'latoBold',
+    size: 36.7,
+    color: INK,
+    x: 1269.9,
+    y: 852,
+    align: 'left',
+    maxWidth: 200,
+  },
   name: {
     font: 'helvetica',
     size: 34,
@@ -220,10 +231,10 @@ export class CertificateDocumentsService {
     variant: CertificateVariant,
     data: CertificateData,
   ): Promise<Uint8Array> {
-    const course = teflCourseLabel(data.courseTitle);
+    const course = courseLabel(data.courseTitle);
     if (!course) {
       throw new BadRequestException(
-        'Certificates can only be generated for TEFL courses at the moment.',
+        'Certificates can only be generated for TEFL and TESOL courses.',
       );
     }
     if (!data.certificateNo || !data.issueDate) {
@@ -247,7 +258,7 @@ export class CertificateDocumentsService {
       const layout = CERTIFICATE_LAYOUT[variant];
       await draw(
         layout.course,
-        `This certificate has been issued upon completion of ${course} course by`,
+        `This certificate has been issued upon completion of ${course.label} course by`,
       );
       await draw(layout.name, name);
       await draw(layout.number, `Certificate Number : ${data.certificateNo}`);
@@ -256,7 +267,8 @@ export class CertificateDocumentsService {
       const layout = TRANSCRIPT_LAYOUT;
       await draw(layout.name, name);
       await draw(layout.dob, formatDateOfBirth(data.dateOfBirth));
-      await draw(layout.course, course);
+      await draw(layout.programme, `${course.programme})`);
+      await draw(layout.course, course.label);
       await draw(layout.number, data.certificateNo);
       await draw(layout.issued, issued);
     }
@@ -270,13 +282,16 @@ export class CertificateDocumentsService {
     return pdf.save();
   }
 
-  // Only what the document uses: the transcript is all Helvetica, so it skips the TTF embeds.
+  // Only what the document uses: the transcript needs Lato Bold for its heading, not Garamond.
   private async embedFonts(
     pdf: PDFDocument,
     document: CertificateDocument,
   ): Promise<Fonts> {
     const fonts: Fonts = {
       helvetica: await pdf.embedFont(StandardFonts.Helvetica),
+      latoBold: await pdf.embedFont(await this.asset('fonts/Lato-Bold.ttf'), {
+        subset: true,
+      }),
     };
     if (document === 'certificate') {
       fonts.helveticaBold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -285,10 +300,6 @@ export class CertificateDocumentsService {
       fonts.garamondItalic = await pdf.embedFont(
         await this.asset('fonts/EBGaramond-Italic.ttf'),
         { subset: false },
-      );
-      fonts.latoBold = await pdf.embedFont(
-        await this.asset('fonts/Lato-Bold.ttf'),
-        { subset: true },
       );
     }
     return fonts;
